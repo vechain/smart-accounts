@@ -30,7 +30,7 @@ async function main() {
   const version = await simpleAccountFactory.version();
   console.log(`New SimpleAccountFactory version: ${version}`);
 
-  if (parseInt(version) !== 2) {
+  if (version !== 2n) {
     throw new Error(
       `SimpleAccountFactory version is not the expected one: ${version}`
     );

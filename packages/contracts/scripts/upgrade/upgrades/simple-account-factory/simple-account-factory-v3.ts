@@ -1,6 +1,6 @@
 import { getConfig } from "@repo/config";
 import { upgradeProxy } from "../../../helpers";
-import { EnvConfig } from "@repo/config/contracts";
+import { EnvConfig, getContractsConfig } from "@repo/config/contracts";
 import { SimpleAccountFactory } from "../../../../typechain-types";
 import { ethers } from "hardhat";
 
@@ -10,6 +10,9 @@ async function main() {
   }
 
   const config = getConfig(process.env.VITE_APP_ENV as EnvConfig);
+  const contractsConfig = getContractsConfig(
+    process.env.VITE_APP_ENV as EnvConfig
+  );
 
   console.log(
     `Upgrading SimpleAccountFactory contract at address: ${config.simpleAccountFactoryContractAddress} on network: ${config.network.name}`
@@ -30,7 +33,7 @@ async function main() {
     "SimpleAccountFactoryV2",
     "SimpleAccountFactory",
     config.simpleAccountFactoryContractAddress,
-    [await simpleAccountImpl.getAddress()],
+    [await simpleAccountImpl.getAddress(), contractsConfig.B3TR_TOKEN_ADDRESS],
     {
       version: 3,
     }
@@ -42,7 +45,7 @@ async function main() {
   const version = await simpleAccountFactory.version();
   console.log(`New SimpleAccountFactory version: ${version}`);
 
-  if (parseInt(version) !== 3) {
+  if (version !== 3n) {
     throw new Error(
       `SimpleAccountFactory version is not the expected one: ${version}`
     );

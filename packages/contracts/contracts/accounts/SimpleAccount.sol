@@ -27,6 +27,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  *
  * ---------- Version 3 ----------
  * - Added execute multiple transactions with authorization, to sign all clauses at once.
+ * - Return integer in version(), instead of string.
  */
 contract SimpleAccount is
     Initializable,
@@ -362,8 +363,8 @@ contract SimpleAccount is
      * @dev Get the version of the account
      * @return the version of the account
      */
-    function version() public pure returns (string memory) {
-        return "3";
+    function version() public pure returns (uint256) {
+        return 3;
     }
 
     // ---------- Fallback ---------- //

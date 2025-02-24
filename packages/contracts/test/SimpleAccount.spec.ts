@@ -22,15 +22,14 @@ describe("SimpleAccount", () => {
 
       const version = await account.version();
 
-      expect(version).to.equal("3");
+      expect(version).to.equal(3n);
     });
 
     it("owner (and only owner) can upgrade the account", async () => {
       const { deployer, otherAccounts } = await getOrDeployContracts(true);
 
       const { smartAccount } = await createSmartAccountThroughFactory(deployer);
-
-      expect(await smartAccount.version()).to.equal("3");
+      expect(await smartAccount.version()).to.equal(3n);
 
       // let' deploy a new implementation
       const Contract = await ethers.getContractFactory("SimpleAccountV2");
