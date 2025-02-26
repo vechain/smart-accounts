@@ -25,12 +25,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * - Deploy v3 of SimpleAccount implementation and reinitialize the factory.
  * - Added event ContractReinitialized(uint256 version) to reinitialization of the factory.
  * - Added currentAccountImplementationVersion() method to know current version of the account implementation.
- * - Renamed accountImplementation to accountImplementationV1 to make it clear that it is the v1 of the account implementation.
- * - Added accountImplementations array to store all versions of the account implementation.
- * - Added b3tr token address to the factory to be used to check if an account is legacy or not.
- * - Return integer in version(), instead of string.
- * - Fixed: createAccountWithSalt() method was using the getAccountAddress() method instead of getAccountAddressWithSalt() to calculate the address,
- * - Fixed: emit AccountCreated after the account is created, so the address is not 0.
+ * - Renamed accountImplementation to accountImplementationV1 to increase clarity.
+ * - Added accountImplementationV3 to store the v3 of the smart account implementation contract.
+ * - Added b3tr token address, used to check if an account is legacy or not.
+ * - Added isLegacyAccount() method to check if an account is legacy or not.
+ * - version() returns an integer, instead of a string.
+ * - Fixed: createAccountWithSalt() method was using the getAccountAddress() method instead of getAccountAddressWithSalt()
+ * - Fixed: emit AccountCreated after the account is created, so the address is not 0
  *
  * WARNING: In order to maintain consistency of legacy account addresses, we added new checks when calculating the address of a smart account.
  * Those checks are needed because changing the implementation address also changes the account address, so we must ensure that
@@ -47,8 +48,8 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     /// @notice The v1 of the simple account implementation (before any upgrade)
     SimpleAccount public accountImplementationV1;
 
-    /// @notice The new versions of the simple account implementation
-    SimpleAccount[] public accountImplementations;
+    /// @notice The new version of the simple account implementation
+    SimpleAccount public accountImplementationV3;
 
     /// @notice The B3TR token used as reward for the users in VeBetterDAO
     IERC20 public b3tr;
@@ -78,19 +79,11 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     }
 
     function initializeV3(
-        address newImplementation,
+        address newImplementationV3,
         address b3trToken
     ) public reinitializer(3) {
-        // Store the old implementation first
-        accountImplementations.push(accountImplementationV1); // v1
-        // Push the old implementation as v2 because we did not reinitialize the factory in SA upgrade
-        accountImplementations.push(accountImplementationV1); // v2
-
-        // Then push the new implementation as latest version
-        SimpleAccount newAccountImplementation = SimpleAccount(
-            payable(newImplementation)
-        );
-        accountImplementations.push(newAccountImplementation); // v3
+        // Store the new implementation address
+        accountImplementationV3 = SimpleAccount(payable(newImplementationV3));
 
         // Set the B3TR token address
         b3tr = IERC20(b3trToken);
@@ -120,24 +113,47 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
      *
      * @notice The implementation address to use will be decided by checking if the address is legacy or not
      */
-    function createAccount(address owner) public returns (SimpleAccount ret) {
+    function createAccount(
+        address owner
+    ) public returns (SimpleAccount createdAccount) {
         uint256 salt = uint256(uint160(owner));
-        address addr = getAccountAddress(owner);
-        uint256 codeSize = addr.code.length;
-        if (codeSize > 0) {
-            return SimpleAccount(payable(addr));
+
+        // Calculate address with V1 implementation first (same as getAccountAddress)
+        address addressGeneratedWithV1 = Create2.computeAddress(
+            bytes32(salt),
+            keccak256(
+                abi.encodePacked(
+                    type(ERC1967Proxy).creationCode,
+                    abi.encode(
+                        address(accountImplementationV1),
+                        abi.encodeCall(SimpleAccount.initialize, (owner))
+                    )
+                )
+            )
+        );
+
+        // Check if account already exists
+        if (addressGeneratedWithV1.code.length > 0) {
+            return SimpleAccount(payable(addressGeneratedWithV1));
         }
 
-        ret = SimpleAccount(
+        // Check if it's a legacy account
+        bool isLegacy = isLegacyAccount(addressGeneratedWithV1);
+
+        address implementationToUse = isLegacy
+            ? address(accountImplementationV1)
+            : address(accountImplementationV3);
+
+        createdAccount = SimpleAccount(
             payable(
                 new ERC1967Proxy{salt: bytes32(salt)}(
-                    _getImplementationToUse(addr),
+                    implementationToUse,
                     abi.encodeCall(SimpleAccount.initialize, (owner))
                 )
             )
         );
 
-        emit AccountCreated(ret, owner, salt);
+        emit AccountCreated(createdAccount, owner, salt);
     }
 
     /**
@@ -145,28 +161,50 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
      * Returns the address even if the account is already deployed.
      * This method returns an existing account address even after account creation
      *
-     * @notice The implementation address to use will be decided by checking if the address is legacy or not
+     * @notice The implementation address to use will be decided by checking if
+     * the address is legacy or not.
      */
     function createAccountWithSalt(
         address owner,
         uint256 salt
-    ) public returns (SimpleAccount ret) {
-        address addr = getAccountAddressWithSalt(owner, salt);
-        uint256 codeSize = addr.code.length;
-        if (codeSize > 0) {
-            return SimpleAccount(payable(addr));
+    ) public returns (SimpleAccount createdAccount) {
+        // Calculate address with V1 implementation first (same as getAccountAddressWithSalt)
+        address addressGeneratedWithV1 = Create2.computeAddress(
+            bytes32(salt),
+            keccak256(
+                abi.encodePacked(
+                    type(ERC1967Proxy).creationCode,
+                    abi.encode(
+                        address(accountImplementationV1),
+                        abi.encodeCall(SimpleAccount.initialize, (owner))
+                    )
+                )
+            )
+        );
+
+        // Check if account already exists
+        if (addressGeneratedWithV1.code.length > 0) {
+            return SimpleAccount(payable(addressGeneratedWithV1));
         }
 
-        emit AccountCreated(ret, owner, salt);
+        // Check if it's a legacy account
+        bool isLegacy = isLegacyAccount(addressGeneratedWithV1);
 
-        ret = SimpleAccount(
+        // For legacy accounts, deploy with V1 implementation
+        address implementationToUse = isLegacy
+            ? address(accountImplementationV1)
+            : address(accountImplementationV3);
+
+        createdAccount = SimpleAccount(
             payable(
                 new ERC1967Proxy{salt: bytes32(salt)}(
-                    _getImplementationToUse(addr),
+                    implementationToUse,
                     abi.encodeCall(SimpleAccount.initialize, (owner))
                 )
             )
         );
+
+        emit AccountCreated(createdAccount, owner, salt);
     }
 
     // ---------- Getters ---------- //
@@ -183,6 +221,7 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     function getAccountAddress(address owner) public view returns (address) {
         uint256 salt = uint256(uint160(owner));
 
+        // Always calculate with V1 implementation first
         address addressGeneratedWithV1 = Create2.computeAddress(
             bytes32(salt),
             keccak256(
@@ -196,19 +235,25 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
             )
         );
 
-        address actualAddress = Create2.computeAddress(
-            bytes32(salt),
-            keccak256(
-                abi.encodePacked(
-                    type(ERC1967Proxy).creationCode,
-                    abi.encode(
-                        _getImplementationToUse(addressGeneratedWithV1),
-                        abi.encodeCall(SimpleAccount.initialize, (owner))
+        // If it's a legacy account, return the V1 address
+        if (isLegacyAccount(addressGeneratedWithV1)) {
+            return addressGeneratedWithV1;
+        }
+
+        // For new accounts, calculate with V3 implementation
+        return
+            Create2.computeAddress(
+                bytes32(salt),
+                keccak256(
+                    abi.encodePacked(
+                        type(ERC1967Proxy).creationCode,
+                        abi.encode(
+                            address(accountImplementationV3),
+                            abi.encodeCall(SimpleAccount.initialize, (owner))
+                        )
                     )
                 )
-            )
-        );
-        return actualAddress;
+            );
     }
 
     /**
@@ -221,6 +266,7 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         address owner,
         uint256 salt
     ) public view returns (address) {
+        // Always calculate with V1 implementation first
         address addressGeneratedWithV1 = Create2.computeAddress(
             bytes32(salt),
             keccak256(
@@ -234,6 +280,12 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
             )
         );
 
+        // If it's a legacy account, return the V1 address
+        if (isLegacyAccount(addressGeneratedWithV1)) {
+            return addressGeneratedWithV1;
+        }
+
+        // For new accounts, calculate with V3 implementation
         return
             Create2.computeAddress(
                 bytes32(salt),
@@ -241,37 +293,12 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
                     abi.encodePacked(
                         type(ERC1967Proxy).creationCode,
                         abi.encode(
-                            _getImplementationToUse(addressGeneratedWithV1),
+                            address(accountImplementationV3),
                             abi.encodeCall(SimpleAccount.initialize, (owner))
                         )
                     )
                 )
             );
-    }
-
-    /**
-     * @dev Internal function to determine which implementation address to use
-     * - If the account is deployed we know it is legacy, so V1 implementation address is returned.
-     * - If the account is not deployed, we check if it has any balance of B3TR or VET tokens, if it does, we know it is legacy (so V1 implementation address is returned).
-     * - Otherwise, we know it is not legacy, and we can use the V3 implementation address to calculate the counterfactual address.
-     * @param accountAddress The address to check
-     * @return The implementation address to use
-     */
-    function _getImplementationToUse(
-        address accountAddress
-    ) internal view returns (address) {
-        // If the account is deployed, it's legacy
-        if (accountAddress.code.length > 0) {
-            return address(accountImplementationV1);
-        }
-
-        // If it has B3TR or VET balance, it's legacy
-        if (b3tr.balanceOf(accountAddress) > 0 || accountAddress.balance > 0) {
-            return address(accountImplementationV1);
-        }
-
-        // Otherwise use V3 implementation
-        return address(accountImplementations[2]);
     }
 
     /// @notice Returns the current version of the account implementation
@@ -281,15 +308,7 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         returns (uint256)
     {
         return
-            SimpleAccount(
-                payable(
-                    address(
-                        accountImplementations[
-                            accountImplementations.length - 1
-                        ]
-                    )
-                )
-            ).version();
+            SimpleAccount(payable(address(accountImplementationV3))).version();
     }
 
     /**
@@ -301,7 +320,38 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         view
         returns (address)
     {
+        return address(accountImplementationV3);
+    }
+
+    /**
+     * @dev Check if an account is legacy
+     * - If the account is deployed we know it is legacy, so V1 implementation address is returned.
+     * - If the account is not deployed, we check if it has any balance of B3TR or VET tokens, if it does, we know it is legacy (so V1 implementation address is returned).
+     * - Otherwise, we know it is not legacy, and we can use the V3 implementation address to calculate the counterfactual address.
+     * @param accountAddress The address to check
+     * @return True if the account is legacy, false otherwise
+     */
+    function isLegacyAccount(
+        address accountAddress
+    ) public view returns (bool) {
+        if (accountAddress.code.length > 0) {
+            // For deployed accounts, check if they're using the V1 implementation
+            try SimpleAccount(payable(accountAddress)).version() returns (
+                uint256 accountVersion
+            ) {
+                if (accountVersion == 3) {
+                    return false;
+                }
+            } catch {
+                // In the V1 implementation, the version() method is not implemented
+                // so if the contract is deployed, but this method fails, we know it's legacy
+                return true;
+            }
+        }
+
+        // If not deployed but has B3TR or ETH tokens, consider it legacy
         return
-            address(accountImplementations[accountImplementations.length - 1]);
+            b3tr.balanceOf(accountAddress) > 0 ||
+            address(accountAddress).balance > 0;
     }
 }
