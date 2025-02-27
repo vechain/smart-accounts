@@ -10,9 +10,9 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-import "../../core/Helpers.sol";
+import "../core/Helpers.sol";
 import "../../accounts/callback/TokenCallbackHandler.sol";
-import "../../core/UserOperationLib.sol";
+import "../core/UserOperationLib.sol";
 
 /**
  * @title Minimal smart account.

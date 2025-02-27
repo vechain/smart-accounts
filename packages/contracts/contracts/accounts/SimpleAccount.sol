@@ -10,9 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-import "../core/Helpers.sol";
 import "./callback/TokenCallbackHandler.sol";
-import "../core/UserOperationLib.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
@@ -36,8 +34,6 @@ contract SimpleAccount is
     EIP712Upgradeable,
     UUPSUpgradeable
 {
-    using UserOperationLib for PackedUserOperation;
-
     address public owner;
 
     // Nonces are used to prevent replay attacks.
