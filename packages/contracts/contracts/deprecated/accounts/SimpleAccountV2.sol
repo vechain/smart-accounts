@@ -237,10 +237,13 @@ contract SimpleAccountV2 is
 
     /**
      * @dev Get the version of the account
+     * @notice The deployed implementation is returnin a string,
+     * but since this implementation was never actually used,
+     * we can safely return a uint256 to avoid breaking tests.
      * @return the version of the account
      */
-    function version() public pure returns (string memory) {
-        return "2";
+    function version() public pure returns (uint256) {
+        return 2;
     }
 
     // ---------- Fallback ---------- //

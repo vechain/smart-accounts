@@ -30,7 +30,7 @@ export async function deployAll(config: ContractsConfig): Promise<{
       "SimpleAccountFactoryV2",
       "SimpleAccountFactory",
     ],
-    [[], [], [await simpleAccountImpl.getAddress()]],
+    [[], [], [await simpleAccountImpl.getAddress(), config.B3TR_TOKEN_ADDRESS]],
     {
       versions: [undefined, 2, 3],
       logOutput: true,
