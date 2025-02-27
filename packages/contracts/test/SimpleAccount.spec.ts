@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { getOrDeployContracts } from "./helpers/deploy";
 import { ethers } from "hardhat";
 import { createSmartAccountThroughFactory } from "./helpers/common";
+import { SimpleAccount } from "../typechain-types";
 
 describe("SimpleAccount", () => {
   describe("Management", () => {
@@ -15,10 +16,10 @@ describe("SimpleAccount", () => {
 
       await simpleAccountFactory.createAccount(await deployer.getAddress());
 
-      const account = await ethers.getContractAt(
+      const account = (await ethers.getContractAt(
         "SimpleAccount",
         smartAccountAddress
-      );
+      )) as SimpleAccount;
 
       const version = await account.version();
 

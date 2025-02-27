@@ -137,10 +137,9 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
             return SimpleAccount(payable(addressGeneratedWithV1));
         }
 
-        // Check if it's a legacy account
-        bool isLegacy = isLegacyAccount(addressGeneratedWithV1);
-
-        address implementationToUse = isLegacy
+        address implementationToUse = _mustUseV1Implementation(
+            addressGeneratedWithV1
+        )
             ? address(accountImplementationV1)
             : address(accountImplementationV3);
 
@@ -187,11 +186,10 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
             return SimpleAccount(payable(addressGeneratedWithV1));
         }
 
-        // Check if it's a legacy account
-        bool isLegacy = isLegacyAccount(addressGeneratedWithV1);
-
         // For legacy accounts, deploy with V1 implementation
-        address implementationToUse = isLegacy
+        address implementationToUse = _mustUseV1Implementation(
+            addressGeneratedWithV1
+        )
             ? address(accountImplementationV1)
             : address(accountImplementationV3);
 
@@ -236,7 +234,7 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         );
 
         // If it's a legacy account, return the V1 address
-        if (isLegacyAccount(addressGeneratedWithV1)) {
+        if (_mustUseV1Implementation(addressGeneratedWithV1)) {
             return addressGeneratedWithV1;
         }
 
@@ -281,7 +279,7 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         );
 
         // If it's a legacy account, return the V1 address
-        if (isLegacyAccount(addressGeneratedWithV1)) {
+        if (_mustUseV1Implementation(addressGeneratedWithV1)) {
             return addressGeneratedWithV1;
         }
 
@@ -301,7 +299,31 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
             );
     }
 
-    /// @notice Returns the current version of the account implementation
+    /**
+     * @dev Check if an account is legacy
+     * - If the account is deployed we know it is legacy, so V1 implementation address is returned.
+     * - If the account is not deployed, we check if it has any balance of B3TR or VET tokens, if it does, we know it is legacy (so V1 implementation address is returned).
+     * - Otherwise, we know it is not legacy, and we can use the V3 implementation address to calculate the counterfactual address.
+     * @param accountAddressGeneratedWithV1 The address to check
+     * @return True if the account is legacy, false otherwise
+     */
+    function _mustUseV1Implementation(
+        address accountAddressGeneratedWithV1
+    ) internal view returns (bool) {
+        if (accountAddressGeneratedWithV1.code.length > 0) {
+            return true;
+        }
+
+        // If not deployed but has B3TR or ETH tokens, consider it legacy
+        return
+            b3tr.balanceOf(accountAddressGeneratedWithV1) > 0 ||
+            address(accountAddressGeneratedWithV1).balance > 0;
+    }
+
+    /**
+     * @dev Get the current version of the account implementation
+     * @return The current version of the account implementation
+     */
     function currentAccountImplementationVersion()
         public
         view
@@ -324,34 +346,34 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     }
 
     /**
-     * @dev Check if an account is legacy
-     * - If the account is deployed we know it is legacy, so V1 implementation address is returned.
-     * - If the account is not deployed, we check if it has any balance of B3TR or VET tokens, if it does, we know it is legacy (so V1 implementation address is returned).
-     * - Otherwise, we know it is not legacy, and we can use the V3 implementation address to calculate the counterfactual address.
+     * @dev Check if an account needs to be upgraded to a specific version
      * @param accountAddress The address to check
-     * @return True if the account is legacy, false otherwise
+     * @param targetVersion The version to check against
+     * @return True if the account needs to be upgraded to the target version, false otherwise
      */
-    function isLegacyAccount(
-        address accountAddress
+    function accountNeedsUpgradeToVersion(
+        address accountAddress,
+        uint256 targetVersion
     ) public view returns (bool) {
-        if (accountAddress.code.length > 0) {
-            // For deployed accounts, check if they're using the V1 implementation
-            try SimpleAccount(payable(accountAddress)).version() returns (
-                uint256 accountVersion
-            ) {
-                if (accountVersion == 3) {
-                    return false;
-                }
-            } catch {
-                // In the V1 implementation, the version() method is not implemented
-                // so if the contract is deployed, but this method fails, we know it's legacy
-                return true;
-            }
+        if (accountAddress.code.length == 0) {
+            return false; // Not deployed yet, no upgrade needed
         }
 
-        // If not deployed but has B3TR or ETH tokens, consider it legacy
-        return
-            b3tr.balanceOf(accountAddress) > 0 ||
-            address(accountAddress).balance > 0;
+        // Check the version of the deployed account
+        try SimpleAccount(payable(accountAddress)).version() returns (
+            uint256 accountVersion
+        ) {
+            if (accountVersion == targetVersion) {
+                return false; // Already at target version, no upgrade needed
+            }
+
+            if (accountVersion < targetVersion) {
+                return true; // Needs upgrade to target version
+            }
+
+            return false; // Already at a higher version, no upgrade needed
+        } catch {
+            return true; // V1 accounts will fail version check, so they need upgrade
+        }
     }
 }

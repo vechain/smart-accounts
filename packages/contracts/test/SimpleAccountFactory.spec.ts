@@ -263,6 +263,28 @@ describe("SimpleAccountFactory", () => {
       );
       expect(await account2.version()).to.equal(3n);
     });
+
+    it("After upgrading to V3, new created accounts must have the v3 abi", async () => {
+      const { simpleAccountFactory, otherAccounts } =
+        await getOrDeployContracts(true);
+
+      const owner = otherAccounts[0];
+
+      const accountAddress = await simpleAccountFactory.getAccountAddress(
+        await owner.getAddress()
+      );
+
+      await simpleAccountFactory.createAccount(await owner.getAddress());
+
+      const account = (await ethers.getContractAt(
+        "SimpleAccount",
+        accountAddress
+      )) as SimpleAccount;
+
+      const version = await account.version();
+
+      expect(version).to.equal(3n);
+    });
   });
 
   describe("SimpleAccount creation", () => {
@@ -307,60 +329,368 @@ describe("SimpleAccountFactory", () => {
       expect(implementationAddress).to.not.equal("0x");
     });
 
-    it("Can deposit money even if account is not created yet", async () => {
-      const { simpleAccountFactory, otherAccounts } =
-        await getOrDeployContracts(true);
+    it("Can deposit b3tr and VET even if account is not created yet", async () => {
+      const { b3tr, otherAccounts } = await getOrDeployContracts(true);
 
-      const smartAccountOwner = otherAccounts[0];
+      // Deploy V1 factory
+      const simpleAccountFactory = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV1;
 
-      const smartAccountAddress = await simpleAccountFactory.getAccountAddress(
-        await smartAccountOwner.getAddress()
+      console.log("V1 FACTORY DEPLOYED");
+
+      // create account with v1 factory
+      const legacySmartAccountOwner = otherAccounts[0];
+      console.log(
+        "LEGACY SMART ACCOUNT OWNER",
+        await legacySmartAccountOwner.getAddress()
       );
+      console.log(
+        "LEGACY SMART ACCOUNT ADDRESS",
+        await simpleAccountFactory.getAccountAddress(
+          await legacySmartAccountOwner.getAddress()
+        )
+      );
+
+      await simpleAccountFactory.createAccount(
+        await legacySmartAccountOwner.getAddress()
+      );
+
+      console.log("LEGACY ACCOUNT CREATED");
+      console.log("\n\n");
+
+      console.log(
+        "Creating a legacy account without deployment but with a balance"
+      );
+
+      const legacyWithoutDeploymentOwner = otherAccounts[9];
+      const legacyWithoutDeploymentAccountAddress =
+        await simpleAccountFactory.getAccountAddress(
+          await legacyWithoutDeploymentOwner.getAddress()
+        );
+
+      console.log(
+        "LEGACY WITHOUT DEPLOYMENT OWNER",
+        await legacyWithoutDeploymentOwner.getAddress()
+      );
+      console.log(
+        "LEGACY WITHOUT DEPLOYMENT ADDRESS",
+        legacyWithoutDeploymentAccountAddress
+      );
+
+      await legacyWithoutDeploymentOwner.sendTransaction({
+        to: legacyWithoutDeploymentAccountAddress,
+        value: ethers.parseEther("1"),
+      });
+
+      console.log("\n\n");
+
+      // Upgrade factory to V2
+      const simpleAccountFactoryV2 = (await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactoryV2",
+        await simpleAccountFactory.getAddress(),
+        [] // no initialization needed for V2
+      )) as SimpleAccountFactoryV2;
+      expect(await simpleAccountFactoryV2.version()).to.equal("2");
+
+      // Upgrade factory to V3
+      const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3 = await SmartAccountV3.deploy();
+      await smartAccountV3.waitForDeployment();
+
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV2",
+        "SimpleAccountFactory",
+        await simpleAccountFactoryV2.getAddress(),
+        [await smartAccountV3.getAddress(), await b3tr.getAddress()], // V3 initialization args
+        { version: 3 } // specify V3 initialization
+      )) as SimpleAccountFactory;
+      expect(await simpleAccountFactoryV3.version()).to.equal(3n);
+
+      console.log("FACTORY UPGRADED");
+      console.log("CALCULATING NEW SMART ACCOUNT ADDRESS");
+
+      const smartAccountOwner = otherAccounts[5];
+      console.log("SMART ACCOUNT OWNER", await smartAccountOwner.getAddress());
+
+      const smartAccountAddress =
+        await simpleAccountFactoryV3.getAccountAddress(
+          await smartAccountOwner.getAddress()
+        );
+
+      console.log("SMART ACCOUNT ADDRESS", smartAccountAddress);
 
       // Ensure contract is not deployed yet
       const codeBefore = await ethers.provider.getCode(smartAccountAddress);
       expect(codeBefore).to.equal("0x");
 
+      // console.log(
+      //   "SMART ACCOUNT IS LEGACY: ",
+      //   await simpleAccountFactoryV3.isLegacyAccount(smartAccountAddress)
+      // );
+
       const balanceBefore =
         await ethers.provider.getBalance(smartAccountAddress);
       expect(balanceBefore).to.equal(0);
 
-      // Send ETH directly instead of calling deposit
+      console.log("SENDING ETH and B3TR to smart account");
+
+      // Send ETH
       await otherAccounts[0].sendTransaction({
         to: smartAccountAddress,
         value: ethers.parseEther("1"),
       });
 
+      // Send B3TR
+      await b3tr.transfer(smartAccountAddress, ethers.parseEther("1"));
+
       const balanceAfter =
         await ethers.provider.getBalance(smartAccountAddress);
       expect(balanceAfter).to.equal(ethers.parseEther("1"));
 
-      // let's deploy the account now
-      await simpleAccountFactory.createAccount(
-        await smartAccountOwner.getAddress()
+      const b3trBalanceAfter = await b3tr.balanceOf(smartAccountAddress);
+      expect(b3trBalanceAfter).to.equal(ethers.parseEther("1"));
+
+      console.log("TRANSFERRED ETH and B3TR");
+
+      // console.log(
+      //   "SMART ACCOUNT IS LEGACY: ",
+      //   await simpleAccountFactoryV3.isLegacyAccount(smartAccountAddress)
+      // );
+
+      console.log(
+        "Check if smart account address is generated same as before for same owner",
+        "owner",
+        await smartAccountOwner.getAddress(),
+        "address",
+        smartAccountAddress,
+        "getAccountAddress",
+        await simpleAccountFactoryV3.getAccountAddress(
+          await smartAccountOwner.getAddress()
+        )
       );
 
+      // let's deploy the account now
+      const txCreateAccount = await simpleAccountFactoryV3
+        .connect(smartAccountOwner)
+        .createAccount(await smartAccountOwner.getAddress());
+
+      const receiptCreateAccount = await txCreateAccount.wait();
+      // console.log("RECEIPT CREATE ACCOUNT", receiptCreateAccount);
+      // console.log("RECEIPT STATUS CREATE ACCOUNT", receiptCreateAccount?.logs);
+      // console.log("Expected address ", smartAccountAddress);
+      // console.log("Expected owner ", await smartAccountOwner.getAddress());
+
+      const codeAfter2 = await ethers.provider.getCode(smartAccountAddress);
+      expect(codeAfter2).to.not.equal("0x");
+
+      console.log("SMART ACCOUNT CREATED");
+
+      // console.log(
+      //   "SMART ACCOUNT IS LEGACY: ",
+      //   await simpleAccountFactoryV3.isLegacyAccount(smartAccountAddress)
+      // );
+
+      // Let's check that the balance is still the same
       const balanceAfter2 =
         await ethers.provider.getBalance(smartAccountAddress);
       expect(balanceAfter2).to.equal(ethers.parseEther("1"));
 
+      const b3trBalanceAfter2 = await b3tr.balanceOf(smartAccountAddress);
+      expect(b3trBalanceAfter2).to.equal(ethers.parseEther("1"));
+
+      // console.log("B3TR BALANCE on SA AFTER create", b3trBalanceAfter2);
+      // console.log("ETH BALANCE on SA AFTER create", balanceAfter2);
+
       // check that owner can move those funds by calling execute
-      const smartAccountContract = await ethers.getContractAt(
+      const smartAccountContract = (await ethers.getContractAt(
         "SimpleAccount",
         smartAccountAddress
+      )) as SimpleAccount;
+
+      console.log(
+        "SMART ACCOUNT CONTRACT VERSION",
+        await smartAccountContract.version()
       );
+
+      // console.log(
+      //   "ETH BALANCE on SA BEFORE execute",
+      //   ethers.formatEther(
+      //     await ethers.provider.getBalance(smartAccountAddress)
+      //   )
+      // );
+
       const tx = await smartAccountContract
         .connect(smartAccountOwner)
         .execute(
           await smartAccountOwner.getAddress(),
-          ethers.parseEther("1"),
+          ethers.parseEther("0.5"),
           "0x"
         );
-      await tx.wait();
+      const receipt = await tx.wait();
+      // console.log("RECEIPT", receipt);
+      // console.log("RECEIPT STATUS", receipt?.logs);
 
+      // Verify both balances
       const balanceAfter3 =
         await ethers.provider.getBalance(smartAccountAddress);
-      expect(balanceAfter3).to.equal(ethers.parseEther("0"));
+      expect(balanceAfter3).to.equal(ethers.parseEther("0.5"));
+
+      const b2trTx = await smartAccountContract
+        .connect(smartAccountOwner)
+        .execute(
+          await b3tr.getAddress(),
+          0,
+          b3tr.interface.encodeFunctionData("transfer", [
+            await smartAccountOwner.getAddress(),
+            ethers.parseEther("1"),
+          ])
+        );
+      const receipt2 = await b2trTx.wait();
+      // console.log("RECEIPT 2", receipt2);
+      // console.log("RECEIPT STATUS 2", receipt2?.logs);
+
+      const b3trBalanceAfter3 = await b3tr.balanceOf(smartAccountAddress);
+      expect(b3trBalanceAfter3).to.equal(ethers.parseEther("0"));
+
+      // Add some debug logs
+      // console.log(
+      //   "B3TR balance before transfer:",
+      //   ethers.formatEther(await b3tr.balanceOf(smartAccountAddress))
+      // );
+      // console.log("Transfer receipt status:", receipt2?.status);
+      // console.log(
+      //   "B3TR balance after transfer:",
+      //   ethers.formatEther(b3trBalanceAfter3)
+      // );
+
+      console.log(
+        "SMART ACCOUNT ADDRESS: ",
+        await simpleAccountFactoryV3.getAccountAddress(
+          await smartAccountOwner.getAddress()
+        )
+      );
+      // console.log(
+      //   "IS LEGACY: ",
+      //   await simpleAccountFactoryV3.isLegacyAccount(smartAccountAddress)
+      // );
+
+      console.log(
+        "LEGACY GET ACCOUNT ADDRESS: ",
+        await simpleAccountFactoryV3.getAccountAddress(
+          await legacySmartAccountOwner.getAddress()
+        )
+      );
+      try {
+        const legacySmartAccount = await ethers.getContractAt(
+          "SimpleAccount",
+          await simpleAccountFactoryV3.getAccountAddress(
+            await legacySmartAccountOwner.getAddress()
+          )
+        );
+        console.log(
+          "LEGACY ACCOUNT VERSION 1",
+          await legacySmartAccount.version()
+        );
+      } catch {
+        console.log("LEGACY ACCOUNT VERSION 1");
+      }
+      // console.log(
+      //   "IS LEGACY: ",
+      //   await simpleAccountFactoryV3.isLegacyAccount(
+      //     await simpleAccountFactory.getAccountAddress(
+      //       await legacySmartAccountOwner.getAddress()
+      //     )
+      //   )
+      // );
+
+      // If I generate an address now, it should not be legacy, and it should keep not being legacy after I transfer ETH
+      const newAddress = await simpleAccountFactoryV3.getAccountAddress(
+        await otherAccounts[6].getAddress()
+      );
+      console.log("NEW ADDRESS", newAddress);
+      // console.log(
+      //   "IS LEGACY: ",
+      //   await simpleAccountFactoryV3.isLegacyAccount(newAddress)
+      // );
+
+      // Send ETH to the new address
+      await otherAccounts[0].sendTransaction({
+        to: newAddress,
+        value: ethers.parseEther("1"),
+      });
+
+      console.log("DEPOSITED in NEW ADDRESS");
+
+      // Check that the new address is not legacy
+      // console.log(
+      //   "IS LEGACY: ",
+      //   await simpleAccountFactoryV3.isLegacyAccount(newAddress)
+      // );
+
+      // create account
+      const txCreateAccount2 = await simpleAccountFactoryV3
+        .connect(otherAccounts[6])
+        .createAccount(await otherAccounts[6].getAddress());
+
+      const receiptCreateAccount2 = await txCreateAccount2.wait();
+      console.log("ACCOUNT CREATED");
+
+      console.log("GET VERSION");
+      const newAccountContract = await ethers.getContractAt(
+        "SimpleAccount",
+        newAddress
+      );
+      console.log("VERSION", await newAccountContract.version());
+
+      console.log("GET OWNER");
+      const owner = await newAccountContract.owner();
+      console.log("OWNER", owner);
+
+      console.log("\n\n");
+      console.log(
+        "Deployin the legacy account created at the beginning, not deployed but with a balance"
+      );
+
+      const txCreateAccount3 = await simpleAccountFactoryV3
+        .connect(legacyWithoutDeploymentOwner)
+        .createAccount(await legacyWithoutDeploymentOwner.getAddress());
+
+      const receiptCreateAccount3 = await txCreateAccount3.wait();
+      console.log("LEGACY ACCOUNT CREATED");
+
+      const legacyWithoutDeploymentAccount = await ethers.getContractAt(
+        "SimpleAccount",
+        legacyWithoutDeploymentAccountAddress
+      );
+
+      try {
+        console.log(
+          "LEGACY ACCOUNT VERSION",
+          await legacyWithoutDeploymentAccount.version()
+        );
+      } catch {
+        console.log("LEGACY ACCOUNT VERSION 1");
+      }
+
+      console.log("Upgrade this legacy account to V3");
+      const implementationV3Address =
+        await simpleAccountFactoryV3.accountImplementationV3();
+
+      const txUpgradeLegacyAccount = await legacyWithoutDeploymentAccount
+        .connect(legacyWithoutDeploymentOwner)
+        .upgradeToAndCall(implementationV3Address, "0x");
+      const receiptUpgradeLegacyAccount = await txUpgradeLegacyAccount.wait();
+      console.log("LEGACY ACCOUNT UPGRADED to V3");
+
+      console.log(
+        "LEGACY ACCOUNT VERSION",
+        await legacyWithoutDeploymentAccount.version()
+      );
+
+      console.log("\n\n");
     });
 
     it("Can create an account with salt", async () => {
