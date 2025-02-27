@@ -26,8 +26,9 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * - Added transferOwnership method to allow for ownership transfer of the smart account.
  *
  * ---------- Version 3 ----------
- * - Added execute multiple transactions with authorization, to sign all clauses at once.
- * - Return integer in version(), instead of string.
+ * - Added executeBatchWithAuthorization() method, so multiple clauses can be signed at once.
+ * - Using nonces in new executeBatchWithAuthorization() method to prevent replay attacks (executeWithAuthorization() remains without nonces for backwards compatibility).
+ * - version() returns an integer, instead of a string.
  */
 contract SimpleAccount is
     Initializable,
@@ -39,12 +40,18 @@ contract SimpleAccount is
 
     address public owner;
 
+    mapping(bytes32 => bool) public usedNonces;
+
     event SimpleAccountInitialized(address indexed owner);
 
     // ---------- Initializer ---------- //
 
     constructor() {
         _disableInitializers();
+    }
+
+    function version() public pure returns (uint256) {
+        return 3;
     }
 
     /**
@@ -88,10 +95,7 @@ contract SimpleAccount is
         );
     }
 
-    /**
-     * @dev Require the function call went through owner
-     * @dev It will fail if it is not directly called by the owner (eg: called by another contract, or by providing a signature)
-     */
+    // Require the function call went through owner
     function _requireFromOwner() internal view {
         require(msg.sender == owner, "account: not Owner or EntryPoint");
     }
@@ -125,7 +129,37 @@ contract SimpleAccount is
     }
 
     /**
+     * @dev execute a sequence of transactions
+     * @dev to reduce gas consumption for trivial case (no value), use a zero-length array to mean zero value
+     * @param dest an array of destination addresses
+     * @param value an array of values to pass to each call. can be zero-length for no-value calls
+     * @param func an array of calldata to pass to each call
+     */
+    function executeBatch(
+        address[] calldata dest,
+        uint256[] calldata value,
+        bytes[] calldata func
+    ) external {
+        _requireFromOwner();
+        require(
+            dest.length == func.length &&
+                (value.length == 0 || value.length == func.length),
+            "wrong array lengths"
+        );
+        if (value.length == 0) {
+            for (uint256 i = 0; i < dest.length; i++) {
+                _call(dest[i], 0, func[i]);
+            }
+        } else {
+            for (uint256 i = 0; i < dest.length; i++) {
+                _call(dest[i], value[i], func[i]);
+            }
+        }
+    }
+
+    /**
      * @dev execute a transaction (called directly from owner) authorized via signatures
+     * @notice There is an attack vector here, by replaying the same signature on the same account.
      * @param to destination address to call
      * @param value the value to pass in this call
      * @param data the calldata to pass in this call
@@ -157,35 +191,35 @@ contract SimpleAccount is
      * @param to an array of destination addresses
      * @param value an array of values to pass to each call
      * @param data an array of calldata to pass to each call
-     * @param validAfter an array of unix timestamps after which the signature will be accepted
-     * @param validBefore an array of unix timestamps until the signature will be accepted
+     * @param validAfter an unix timestamp after which the signature will be accepted
+     * @param validBefore an unix timestamp until the signature will be accepted
+     * @param nonce the nonce to use for the batch
      * @param signature the signed type4 signature for the entire batch
      */
     function executeBatchWithAuthorization(
         address[] calldata to,
         uint256[] calldata value,
         bytes[] calldata data,
-        uint256[] calldata validAfter,
-        uint256[] calldata validBefore,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
         bytes calldata signature
     ) external payable {
         // Check array lengths match
         require(
-            to.length == value.length &&
-                value.length == data.length &&
-                data.length == validAfter.length &&
-                validAfter.length == validBefore.length,
+            to.length == value.length && value.length == data.length,
             "Array lengths mismatch"
         );
 
+        // Check that the signature is not used yet
+        require(
+            !usedNonces[nonce],
+            "Nonce already used, please sign a new transaction"
+        );
+
         // Check time validity for all transactions
-        for (uint256 i = 0; i < validAfter.length; i++) {
-            require(
-                block.timestamp > validAfter[i],
-                "Authorization not yet valid"
-            );
-            require(block.timestamp < validBefore[i], "Authorization expired");
-        }
+        require(block.timestamp > validAfter, "Authorization not yet valid");
+        require(block.timestamp < validBefore, "Authorization expired");
 
         // Validate batch authorization
         _validateBatchAuthorization(
@@ -194,14 +228,27 @@ contract SimpleAccount is
             data,
             validAfter,
             validBefore,
+            nonce,
             signature
         );
+
+        usedNonces[nonce] = true;
 
         // Execute each transaction
         for (uint256 i = 0; i < to.length; i++) {
             _call(to[i], value[i], data[i]);
         }
     }
+
+    /**
+     * @dev Transfer ownership of the account
+     * @param newOwner the new owner of the account
+     */
+    function transferOwnership(address newOwner) public onlyOwner {
+        owner = newOwner;
+    }
+
+    // ---------- Signature Validation ---------- //
 
     /**
      * @dev Validate a batch authorization
@@ -215,12 +262,13 @@ contract SimpleAccount is
         address[] calldata to,
         uint256[] calldata value,
         bytes[] calldata data,
-        uint256[] calldata validAfter,
-        uint256[] calldata validBefore,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
         bytes calldata signature
     ) internal view {
         bytes32 typeHash = keccak256(
-            "ExecuteBatchWithAuthorization(address[] to,uint256[] value,bytes[] data,uint256[] validAfter,uint256[] validBefore)"
+            "ExecuteBatchWithAuthorization(address[] to,uint256[] value,bytes[] data,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
         );
 
         // Hash arrays according to EIP-712 array encoding rules
@@ -235,8 +283,9 @@ contract SimpleAccount is
                 keccak256(abi.encodePacked(to)),
                 keccak256(abi.encodePacked(value)),
                 keccak256(abi.encodePacked(dataHashes)),
-                keccak256(abi.encodePacked(validAfter)),
-                keccak256(abi.encodePacked(validBefore))
+                validAfter,
+                validBefore,
+                nonce
             )
         );
         bytes32 digest = _hashTypedDataV4(structHash);
@@ -253,43 +302,6 @@ contract SimpleAccount is
                 )
             )
         );
-    }
-
-    /**
-     * @dev execute a sequence of transactions
-     * @dev to reduce gas consumption for trivial case (no value), use a zero-length array to mean zero value
-     * @param dest an array of destination addresses
-     * @param value an array of values to pass to each call. can be zero-length for no-value calls
-     * @param func an array of calldata to pass to each call
-     */
-    function executeBatch(
-        address[] calldata dest,
-        uint256[] calldata value,
-        bytes[] calldata func
-    ) external {
-        _requireFromOwner();
-        require(
-            dest.length == func.length &&
-                (value.length == 0 || value.length == func.length),
-            "wrong array lengths"
-        );
-        if (value.length == 0) {
-            for (uint256 i = 0; i < dest.length; i++) {
-                _call(dest[i], 0, func[i]);
-            }
-        } else {
-            for (uint256 i = 0; i < dest.length; i++) {
-                _call(dest[i], value[i], func[i]);
-            }
-        }
-    }
-
-    /**
-     * @dev Transfer ownership of the account
-     * @param newOwner the new owner of the account
-     */
-    function transferOwnership(address newOwner) public onlyOwner {
-        owner = newOwner;
     }
 
     /**
@@ -327,22 +339,6 @@ contract SimpleAccount is
     // ---------- Internal ---------- //
 
     /**
-     * @dev Implement template method of BaseAccount
-     * @param userOp the user operation to validate
-     * @param userOpHash the hash of the user operation
-     * @return validationData the validation data
-     */
-    function _validateSignature(
-        PackedUserOperation calldata userOp,
-        bytes32 userOpHash
-    ) internal virtual returns (uint256 validationData) {
-        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(userOpHash);
-        if (owner != ECDSA.recover(hash, userOp.signature))
-            return SIG_VALIDATION_FAILED;
-        return SIG_VALIDATION_SUCCESS;
-    }
-
-    /**
      * @dev Internal function to call a target
      * @param target the target address to call
      * @param value the value to pass in this call
@@ -358,14 +354,6 @@ contract SimpleAccount is
     }
 
     // ---------- Getters ---------- //
-
-    /**
-     * @dev Get the version of the account
-     * @return the version of the account
-     */
-    function version() public pure returns (uint256) {
-        return 3;
-    }
 
     // ---------- Fallback ---------- //
 
