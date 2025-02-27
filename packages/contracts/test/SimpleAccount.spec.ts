@@ -368,8 +368,9 @@ describe("SimpleAccount", () => {
           { name: "to", type: "address[]" },
           { name: "value", type: "uint256[]" },
           { name: "data", type: "bytes[]" },
-          { name: "validAfter", type: "uint256[]" },
-          { name: "validBefore", type: "uint256[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
         ],
       };
 
@@ -398,8 +399,9 @@ describe("SimpleAccount", () => {
         to: transactions.map((t) => t.to),
         value: transactions.map((t) => t.value),
         data: transactions.map((t) => t.data),
-        validAfter: Array(transactions.length).fill(validAfter),
-        validBefore: Array(transactions.length).fill(validBefore),
+        validAfter,
+        validBefore,
+        nonce: ethers.randomBytes(32),
       };
 
       const signature = await deployer.signTypedData(domain, types, message);
@@ -411,6 +413,7 @@ describe("SimpleAccount", () => {
           message.data,
           message.validAfter,
           message.validBefore,
+          message.nonce,
           signature
         )
       ).to.not.be.reverted;
@@ -435,8 +438,9 @@ describe("SimpleAccount", () => {
           { name: "to", type: "address[]" },
           { name: "value", type: "uint256[]" },
           { name: "data", type: "bytes[]" },
-          { name: "validAfter", type: "uint256[]" },
-          { name: "validBefore", type: "uint256[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
         ],
       };
 
@@ -465,8 +469,9 @@ describe("SimpleAccount", () => {
         to: transactions.map((t) => t.to),
         value: transactions.map((t) => t.value),
         data: transactions.map((t) => t.data),
-        validAfter: Array(transactions.length).fill(validAfter),
-        validBefore: Array(transactions.length).fill(validBefore),
+        validAfter,
+        validBefore,
+        nonce: ethers.randomBytes(32),
       };
 
       const signature = await deployer.signTypedData(domain, types, message);
@@ -478,6 +483,7 @@ describe("SimpleAccount", () => {
           message.data,
           message.validAfter,
           message.validBefore,
+          message.nonce,
           signature
         )
       ).to.not.be.reverted;
