@@ -40,6 +40,11 @@ contract SimpleAccount is
 
     address public owner;
 
+    // Nonces are used to prevent replay attacks.
+    // The nonce can be genarated in many ways by devs (using Date.now(), block.number, ethers.randomBytes(32), etc.)
+    // and is part of the data the user signs, which means that for each nonce there is a different signature.
+    // Every time the `executeBatchWithAuthorization()` is triggered the nonce is saved onchain,
+    // which means that the same nonce cannot be reused, meaning that neither the signature can be reused.
     mapping(bytes32 => bool) public usedNonces;
 
     event SimpleAccountInitialized(address indexed owner);
