@@ -66,6 +66,13 @@ describe("SimpleAccount", () => {
       await smartAccount.transferOwnership(await newOwner.getAddress());
 
       expect(await smartAccount.owner()).to.equal(await newOwner.getAddress());
+
+      // old owner cannot transfer ownership again
+      await expect(
+        smartAccount
+          .connect(deployer)
+          .transferOwnership(await newOwner.getAddress())
+      ).to.be.revertedWith("only owner");
     });
 
     it("owner can upgrade the account by providing a signature", async () => {
@@ -127,6 +134,19 @@ describe("SimpleAccount", () => {
 
       expect(await smartAccount.version()).to.equal("2");
     });
+
+    it("cannot transfer ownership to zero address", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      // Try to transfer ownership to zero address
+      await expect(
+        smartAccount.transferOwnership(ethers.ZeroAddress)
+      ).to.be.revertedWith("Cannot transfer ownership to the zero address");
+
+      // Verify ownership hasn't changed
+      expect(await smartAccount.owner()).to.equal(await deployer.getAddress());
+    });
   });
 
   describe("Execution", () => {
@@ -160,6 +180,16 @@ describe("SimpleAccount", () => {
 
       const { smartAccount } = await createSmartAccountThroughFactory(deployer);
 
+      // Test with empty value array (should default to zero values)
+      expect(
+        smartAccount.executeBatch(
+          [await deployer.getAddress(), await deployer.getAddress()],
+          [], // empty value array
+          ["0x", "0x"]
+        )
+      ).to.not.be.reverted;
+
+      // Test with explicit value array
       expect(
         smartAccount.executeBatch(
           [await deployer.getAddress(), await deployer.getAddress()],
@@ -168,6 +198,7 @@ describe("SimpleAccount", () => {
         )
       ).to.not.be.reverted;
 
+      // Test that non-owner cannot execute
       expect(
         smartAccount
           .connect(otherAccounts[0])
@@ -177,6 +208,38 @@ describe("SimpleAccount", () => {
             ["0x", "0x"]
           )
       ).to.be.reverted;
+    });
+
+    it("executeBatch reverts if array lengths don't match", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      // Test when dest.length != func.length
+      await expect(
+        smartAccount.executeBatch(
+          [await deployer.getAddress(), await deployer.getAddress()], // length 2
+          [], // empty value array is ok
+          ["0x"] // length 1
+        )
+      ).to.be.revertedWith("wrong array lengths");
+
+      // Test when value array length doesn't match (when not empty)
+      await expect(
+        smartAccount.executeBatch(
+          [await deployer.getAddress(), await deployer.getAddress()], // length 2
+          [ethers.parseEther("0")], // length 1
+          ["0x", "0x"] // length 2
+        )
+      ).to.be.revertedWith("wrong array lengths");
+
+      // Test when all arrays have different lengths
+      await expect(
+        smartAccount.executeBatch(
+          [await deployer.getAddress(), await deployer.getAddress()], // length 2
+          [ethers.parseEther("0")], // length 1
+          ["0x"] // length 1
+        )
+      ).to.be.revertedWith("wrong array lengths");
     });
 
     it("owner (and only owner) can execute a function by providing a signature", async () => {
@@ -247,8 +310,8 @@ describe("SimpleAccount", () => {
       ).to.be.reverted;
     });
 
-    it("can not execute with signature if the message is not valid", async () => {
-      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+    it("cannot execute with signature if validAfter is in the future", async () => {
+      const { deployer } = await getOrDeployContracts(true);
       const { smartAccount } = await createSmartAccountThroughFactory(deployer);
 
       const chainId = await ethers.provider.getNetwork().then((n) => n.chainId);
@@ -273,17 +336,12 @@ describe("SimpleAccount", () => {
         ],
       };
 
-      // The test is failing (as expected) because it's trying to execute a transaction with an expired signature. The smart contract is correctly rejecting it because:
-      // Current time is now
-      // The signature's validBefore time is now - 60 (60 seconds in the past)
-      // 3. Therefore, the signature has expired and the transaction reverts
-      // This is actually testing the correct behavior - that expired signatures cannot be used. If you want to test a valid signature instead, you should use + 60 to set the expiration 60 seconds in the future.
       const message = {
         to,
         value,
         data,
-        validAfter: 0,
-        validBefore: Math.floor(Date.now() / 1000) - 60, // valid for 60 seconds
+        validAfter: Math.floor(Date.now() / 1000) + 3600, // 1 hour in the future
+        validBefore: Math.floor(Date.now() / 1000) + 7200, // 2 hours in the future
       };
 
       const signature = await deployer.signTypedData(domain, types, message);
@@ -297,7 +355,55 @@ describe("SimpleAccount", () => {
           message.validBefore,
           signature
         )
-      ).to.be.reverted;
+      ).to.be.revertedWith("Authorization not yet valid");
+    });
+
+    it("cannot execute with signature if validBefore is in the past", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const chainId = await ethers.provider.getNetwork().then((n) => n.chainId);
+      const to = await deployer.getAddress();
+      const value = ethers.parseEther("0");
+      const data = "0x";
+
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: Number(chainId),
+        verifyingContract: await smartAccount.getAddress(),
+      };
+
+      const types = {
+        ExecuteWithAuthorization: [
+          { name: "to", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "data", type: "bytes" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+        ],
+      };
+
+      const message = {
+        to,
+        value,
+        data,
+        validAfter: Math.floor(Date.now() / 1000) - 7200, // 2 hours in the past
+        validBefore: Math.floor(Date.now() / 1000) - 3600, // 1 hour in the past
+      };
+
+      const signature = await deployer.signTypedData(domain, types, message);
+
+      await expect(
+        smartAccount.executeWithAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          signature
+        )
+      ).to.be.revertedWith("Authorization expired");
     });
 
     it("cannot execute with signature if parameters differ from signed message", async () => {
@@ -419,12 +525,11 @@ describe("SimpleAccount", () => {
       ).to.not.be.reverted;
     });
 
-    it("can batch execute transfer and transferOwnership with signatures", async () => {
-      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+    it("cannot execute batch with signature if array lengths don't match", async () => {
+      const { deployer } = await getOrDeployContracts(true);
       const { smartAccount } = await createSmartAccountThroughFactory(deployer);
 
       const chainId = await ethers.provider.getNetwork().then((n) => n.chainId);
-      const newOwner = otherAccounts[0];
 
       const domain = {
         name: "Wallet",
@@ -444,33 +549,13 @@ describe("SimpleAccount", () => {
         ],
       };
 
-      const transferOwnershipData = smartAccount.interface.encodeFunctionData(
-        "transferOwnership",
-        [await newOwner.getAddress()]
-      );
-
-      const transactions = [
-        {
-          to: await deployer.getAddress(),
-          value: ethers.parseEther("0"),
-          data: "0x", // empty data for ETH transfer
-        },
-        {
-          to: await smartAccount.getAddress(),
-          value: ethers.parseEther("0"),
-          data: transferOwnershipData,
-        },
-      ];
-
-      const validBefore = Math.floor(Date.now() / 1000) + 3600;
-      const validAfter = 0;
-
+      // Create mismatched arrays
       const message = {
-        to: transactions.map((t) => t.to),
-        value: transactions.map((t) => t.value),
-        data: transactions.map((t) => t.data),
-        validAfter,
-        validBefore,
+        to: [await deployer.getAddress(), await deployer.getAddress()], // length 2
+        value: [ethers.parseEther("0")], // length 1
+        data: ["0x"], // length 1
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 3600,
         nonce: ethers.randomBytes(32),
       };
 
@@ -486,10 +571,486 @@ describe("SimpleAccount", () => {
           message.nonce,
           signature
         )
+      ).to.be.revertedWith("Array lengths mismatch");
+    });
+
+    it("cannot execute batch with signature if validAfter is in the future", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const chainId = await ethers.provider.getNetwork().then((n) => n.chainId);
+
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: Number(chainId),
+        verifyingContract: await smartAccount.getAddress(),
+      };
+
+      const types = {
+        ExecuteBatchWithAuthorization: [
+          { name: "to", type: "address[]" },
+          { name: "value", type: "uint256[]" },
+          { name: "data", type: "bytes[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      };
+
+      const transactions = [
+        {
+          to: await deployer.getAddress(),
+          value: ethers.parseEther("0"),
+          data: ethers.hexlify(ethers.toUtf8Bytes("test")),
+        },
+      ];
+
+      const message = {
+        to: transactions.map((t) => t.to),
+        value: transactions.map((t) => t.value),
+        data: transactions.map((t) => t.data),
+        validAfter: Math.floor(Date.now() / 1000) + 3600, // 1 hour in the future
+        validBefore: Math.floor(Date.now() / 1000) + 7200, // 2 hours in the future
+        nonce: ethers.randomBytes(32),
+      };
+
+      const signature = await deployer.signTypedData(domain, types, message);
+
+      await expect(
+        smartAccount.executeBatchWithAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          message.nonce,
+          signature
+        )
+      ).to.be.revertedWith("Authorization not yet valid");
+    });
+
+    it("cannot execute batch with signature if validBefore is in the past", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const chainId = await ethers.provider.getNetwork().then((n) => n.chainId);
+
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: Number(chainId),
+        verifyingContract: await smartAccount.getAddress(),
+      };
+
+      const types = {
+        ExecuteBatchWithAuthorization: [
+          { name: "to", type: "address[]" },
+          { name: "value", type: "uint256[]" },
+          { name: "data", type: "bytes[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      };
+
+      const transactions = [
+        {
+          to: await deployer.getAddress(),
+          value: ethers.parseEther("0"),
+          data: ethers.hexlify(ethers.toUtf8Bytes("test")),
+        },
+      ];
+
+      const message = {
+        to: transactions.map((t) => t.to),
+        value: transactions.map((t) => t.value),
+        data: transactions.map((t) => t.data),
+        validAfter: Math.floor(Date.now() / 1000) - 7200, // 2 hours in the past
+        validBefore: Math.floor(Date.now() / 1000) - 3600, // 1 hour in the past
+        nonce: ethers.randomBytes(32),
+      };
+
+      const signature = await deployer.signTypedData(domain, types, message);
+
+      await expect(
+        smartAccount.executeBatchWithAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          message.nonce,
+          signature
+        )
+      ).to.be.revertedWith("Authorization expired");
+    });
+
+    it("should bubble up revert messages from failed calls", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      // Deploy a mock contract that will revert with a message
+      const mockContract = await ethers.deployContract("MockReverting");
+      await mockContract.waitForDeployment();
+
+      // Get the revert function's encoded data
+      const revertData =
+        mockContract.interface.encodeFunctionData("revertWithMessage");
+
+      // Try to execute the reverting call through the smart account
+      await expect(
+        smartAccount.execute(await mockContract.getAddress(), 0, revertData)
+      ).to.be.revertedWith("Custom revert message");
+    });
+  });
+
+  describe("Upgrade", () => {
+    it("user can know when to upgrade to V3", async () => {
+      const { deployer, simpleAccountFactory } =
+        await getOrDeployContracts(true);
+
+      expect(await simpleAccountFactory.version()).to.equal(3n);
+
+      const { smartAccount, smartAccountAddress } =
+        await createSmartAccountThroughFactory(deployer);
+
+      expect(await smartAccount.version()).to.equal(3n);
+
+      // check if upgrade is needed (it shouldn't since it was created with V3 of factory)
+      expect(
+        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+          smartAccountAddress,
+          3
+        )
+      ).to.be.false;
+
+      // now let's downgrade the account of the user to v1
+      const Contract = await ethers.getContractFactory("SimpleAccountV1");
+      const implementation = await Contract.deploy();
+      await implementation.waitForDeployment();
+
+      await smartAccount.upgradeToAndCall(
+        await implementation.getAddress(),
+        "0x"
+      );
+
+      try {
+        await smartAccount.version();
+
+        // this point should not be reached because it is a legacy account
+        expect(false).to.be.true;
+      } catch {
+        // expect to fail because it is a legacy account
+        expect(true).to.be.true;
+      }
+
+      // check if upgrade is needed (it should since it was created with V1 of factory)
+      expect(
+        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+          smartAccountAddress,
+          3
+        )
+      ).to.be.true;
+    });
+
+    it("Checking available upgrades for a not deployed account should return false", async () => {
+      const { deployer, simpleAccountFactory } =
+        await getOrDeployContracts(true);
+
+      const accountAddress =
+        await simpleAccountFactory.getAccountAddressWithSalt(
+          await deployer.getAddress(),
+          ethers.toBigInt(ethers.randomBytes(32))
+        );
+
+      // check that code is not deployed at the address
+      const code = await ethers.provider.getCode(accountAddress);
+      expect(code).to.equal("0x");
+
+      // check that the account needs upgrade to v3
+      expect(
+        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+          accountAddress,
+          3
+        )
+      ).to.be.false;
+    });
+  });
+
+  describe("TokenCallbackHandler", () => {
+    it("supports ERC721 and ERC1155 interfaces", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      // Check interface support
+      const ERC721_RECEIVER_INTERFACE_ID = "0x150b7a02";
+      const ERC1155_RECEIVER_INTERFACE_ID = "0x4e2312e0";
+      const ERC165_INTERFACE_ID = "0x01ffc9a7";
+
+      expect(await smartAccount.supportsInterface(ERC721_RECEIVER_INTERFACE_ID))
+        .to.be.true;
+      expect(
+        await smartAccount.supportsInterface(ERC1155_RECEIVER_INTERFACE_ID)
+      ).to.be.true;
+      expect(await smartAccount.supportsInterface(ERC165_INTERFACE_ID)).to.be
+        .true;
+    });
+
+    it("can receive ERC721 tokens", async () => {
+      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      // Deploy ERC721 mock
+      const erc721 = await ethers.deployContract("MyERC721", [
+        await deployer.getAddress(),
+      ]);
+      await erc721.waitForDeployment();
+
+      // Mint token to deployer
+      const tokenId = 1;
+      await erc721.safeMint(await deployer.getAddress(), tokenId);
+
+      // Approve smart account
+      await erc721.approve(await smartAccount.getAddress(), tokenId);
+
+      // Transfer to smart account
+      await erc721.transferFrom(
+        await deployer.getAddress(),
+        await smartAccount.getAddress(),
+        tokenId
+      );
+
+      // Verify ownership
+      expect(await erc721.ownerOf(tokenId)).to.equal(
+        await smartAccount.getAddress()
+      );
+    });
+
+    it("can receive ERC1155 tokens", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      // Deploy ERC1155 mock
+      const erc1155 = await ethers.deployContract("MyERC1155", [
+        await deployer.getAddress(),
+      ]);
+      await erc1155.waitForDeployment();
+
+      // Mint tokens
+      const id = 1;
+      const amount = 100;
+      await erc1155.mint(await deployer.getAddress(), id, amount, "0x");
+
+      // Transfer to smart account
+      await erc1155.safeTransferFrom(
+        await deployer.getAddress(),
+        await smartAccount.getAddress(),
+        id,
+        amount,
+        "0x"
+      );
+
+      // Verify balance
+      expect(
+        await erc1155.balanceOf(await smartAccount.getAddress(), id)
+      ).to.equal(amount);
+    });
+
+    it("can receive batch ERC1155 tokens", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      // Deploy ERC1155 mock
+      const erc1155 = await ethers.deployContract("MyERC1155", [
+        await deployer.getAddress(),
+      ]);
+      await erc1155.waitForDeployment();
+
+      // Mint multiple tokens
+      const ids = [1, 2, 3];
+      const amounts = [100, 200, 300];
+      await erc1155.mintBatch(await deployer.getAddress(), ids, amounts, "0x");
+
+      // Transfer batch to smart account
+      await erc1155.safeBatchTransferFrom(
+        await deployer.getAddress(),
+        await smartAccount.getAddress(),
+        ids,
+        amounts,
+        "0x"
+      );
+
+      // Verify balances
+      for (let i = 0; i < ids.length; i++) {
+        expect(
+          await erc1155.balanceOf(await smartAccount.getAddress(), ids[i])
+        ).to.equal(amounts[i]);
+      }
+    });
+
+    it("can transfer received tokens through owner execution", async () => {
+      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+      const recipient = otherAccounts[0];
+
+      // Deploy and setup ERC721
+      const erc721 = await ethers.deployContract("MyERC721", [
+        await deployer.getAddress(),
+      ]);
+      await erc721.waitForDeployment();
+
+      const tokenId = 1;
+      await erc721.safeMint(await smartAccount.getAddress(), tokenId);
+
+      // Owner executes transfer of ERC721 from smart account
+      const transferData = erc721.interface.encodeFunctionData("transferFrom", [
+        await smartAccount.getAddress(),
+        await recipient.getAddress(),
+        tokenId,
+      ]);
+
+      await smartAccount.execute(await erc721.getAddress(), 0, transferData);
+
+      // Verify transfer
+      expect(await erc721.ownerOf(tokenId)).to.equal(
+        await recipient.getAddress()
+      );
+    });
+
+    it("cannot reuse nonce in batch execution with signature", async () => {
+      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const chainId = await ethers.provider.getNetwork().then((n) => n.chainId);
+
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: Number(chainId),
+        verifyingContract: await smartAccount.getAddress(),
+      };
+
+      const types = {
+        ExecuteBatchWithAuthorization: [
+          { name: "to", type: "address[]" },
+          { name: "value", type: "uint256[]" },
+          { name: "data", type: "bytes[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      };
+
+      const transactions = [
+        {
+          to: await deployer.getAddress(),
+          value: ethers.parseEther("0"),
+          data: ethers.hexlify(ethers.toUtf8Bytes("test")),
+        },
+      ];
+
+      // Create a message with a specific nonce
+      const nonce = ethers.randomBytes(32);
+      const message = {
+        to: transactions.map((t) => t.to),
+        value: transactions.map((t) => t.value),
+        data: transactions.map((t) => t.data),
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 3600,
+        nonce: nonce,
+      };
+
+      const signature = await deployer.signTypedData(domain, types, message);
+
+      // First execution should succeed
+      await expect(
+        smartAccount.executeBatchWithAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          message.nonce,
+          signature
+        )
       ).to.not.be.reverted;
 
-      // Verify ownership was transferred
-      expect(await smartAccount.owner()).to.equal(await newOwner.getAddress());
+      // Second execution with the same nonce should fail
+      await expect(
+        smartAccount.executeBatchWithAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          message.nonce,
+          signature
+        )
+      ).to.be.revertedWith("Nonce already used, please sign a new transaction");
+    });
+
+    it("cannot execute batch with signature from non-owner", async () => {
+      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const chainId = await ethers.provider.getNetwork().then((n) => n.chainId);
+
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: Number(chainId),
+        verifyingContract: await smartAccount.getAddress(),
+      };
+
+      const types = {
+        ExecuteBatchWithAuthorization: [
+          { name: "to", type: "address[]" },
+          { name: "value", type: "uint256[]" },
+          { name: "data", type: "bytes[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      };
+
+      const transactions = [
+        {
+          to: await deployer.getAddress(),
+          value: ethers.parseEther("0"),
+          data: ethers.hexlify(ethers.toUtf8Bytes("test")),
+        },
+      ];
+
+      const message = {
+        to: transactions.map((t) => t.to),
+        value: transactions.map((t) => t.value),
+        data: transactions.map((t) => t.data),
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 3600,
+        nonce: ethers.randomBytes(32),
+      };
+
+      // Sign with a non-owner account
+      const nonOwner = otherAccounts[0];
+      const signature = await nonOwner.signTypedData(domain, types, message);
+
+      const expectedOwner = await deployer.getAddress();
+      const actualSigner = await nonOwner.getAddress();
+
+      await expect(
+        smartAccount.executeBatchWithAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          message.nonce,
+          signature
+        )
+      ).to.be.revertedWith(
+        `Invalid signer. Expected: ${expectedOwner.toLowerCase()} Got: ${actualSigner.toLowerCase()}`
+      );
     });
   });
 });

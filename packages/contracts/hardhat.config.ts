@@ -56,6 +56,9 @@ module.exports = {
   networks: {
     hardhat: {
       chainId: 1337,
+      accounts: {
+        count: 30,
+      },
     },
     vechain_solo: {
       url: getSoloUrl(),

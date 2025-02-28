@@ -2,7 +2,11 @@ import { expect } from "chai";
 import { getOrDeployContracts } from "./helpers/deploy";
 import { ethers } from "hardhat";
 import { getImplementationAddress } from "@openzeppelin/upgrades-core";
-import { deployProxy, upgradeProxy } from "../scripts/helpers/";
+import {
+  deployProxy,
+  getInitializerData,
+  upgradeProxy,
+} from "../scripts/helpers/";
 import {
   SimpleAccount,
   SimpleAccountFactory,
@@ -284,6 +288,276 @@ describe("SimpleAccountFactory", () => {
       const version = await account.version();
 
       expect(version).to.equal(3n);
+    });
+
+    /**
+     * Having a V3 of SimpleAccount means that the implementation address inside the factory changes, which causes the
+     * address calculation through the "Create2" function to resolve to a different account.
+     * This means that before that calling getAccountAddress() or createAccount will return 2
+     * different address before and after the upgrade.
+     * Currently there are alrady 100k accounts created in production and around 500k computed
+     * addresses that received funds.
+     *
+     * Solution
+     * To solve this an algoritm was wrote to calculate the correct address/implementation to use.
+     * Rules:
+     *
+     * First we always calculate the address by using the V1 implementation address of SImpleAccount
+     * Then we check the following criteria:
+     * If the account is deployed we know it is legacy, so V1 implementation address is used.
+     * If the account is not deployed, we check if it has any balance of B3TR or VET balance, if it does,
+     * we know it is legacy so V1 implementation address is used.
+     * If none of the above, it means that the address generated through V1 Implementation was never
+     * used so we can use the V3 Simple Account implementation.
+     *
+     * So what I want to test is the following:
+     *
+     * with V1 of factory we have
+     *
+     * user1: generates address and receives b3tr
+     * user2: generates address only
+     * user3: gen addr, receives b3tr and creates account
+     * user4: generates address and creates account
+     * user5: generates address and receives ETH
+     *
+     * we migrate the factory to V3
+     *
+     * we check that:
+     * user1: has same address
+     * user2: has a different address
+     * user3: has same address
+     * user4: has same address
+     * user5: has same address
+     * new user6: has address calculated with implementation v3
+     *
+     * After this I want to check that when user6 and user2 creates their account the version of
+     * their account returns 3, while the version of all the other accounts
+     * (if not created then create it) has v1 (infact by calling accountNeedsUpgradeToVersion()
+     * in the factory it should return true for all v1 and false for all v3).
+     */
+    it("It should preserve legacy wallets when upgrading to V3", async () => {
+      const { b3tr, otherAccounts } = await getOrDeployContracts(true);
+
+      // Deploy V1 factory
+      const simpleAccountFactory = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV1;
+
+      // Get our test users
+      const [user1, user2, user3, user4, user5, user6] = otherAccounts;
+
+      // Generate addresses for all users with V1 factory
+      const user1AddressV1 = await simpleAccountFactory.getAccountAddress(
+        await user1.getAddress()
+      );
+      const user2AddressV1 = await simpleAccountFactory.getAccountAddress(
+        await user2.getAddress()
+      );
+      const user3AddressV1 = await simpleAccountFactory.getAccountAddress(
+        await user3.getAddress()
+      );
+      const user4AddressV1 = await simpleAccountFactory.getAccountAddress(
+        await user4.getAddress()
+      );
+      const user5AddressV1 = await simpleAccountFactory.getAccountAddress(
+        await user5.getAddress()
+      );
+
+      // user1: generates address and receives b3tr
+      await b3tr.transfer(user1AddressV1, ethers.parseEther("1"));
+
+      // After sending B3TR to user1's address
+      console.log(
+        "User1 B3TR balance before creation:",
+        await b3tr.balanceOf(user1AddressV1)
+      );
+
+      // user2: generates address only (no action needed)
+
+      // user3: gen addr, receives b3tr and creates account
+      await b3tr.transfer(user3AddressV1, ethers.parseEther("1"));
+      await simpleAccountFactory.createAccount(await user3.getAddress());
+
+      // user4: generates address and creates account
+      await simpleAccountFactory.createAccount(await user4.getAddress());
+
+      // user5: generates address and receives ETH
+      await user5.sendTransaction({
+        to: user5AddressV1,
+        value: ethers.parseEther("1"),
+      });
+
+      // After sending ETH to user5's address
+      console.log(
+        "User5 ETH balance before creation:",
+        await ethers.provider.getBalance(user5AddressV1)
+      );
+
+      // Upgrade factory to V3
+      const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3 = await SmartAccountV3.deploy();
+      await smartAccountV3.waitForDeployment();
+
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactory",
+        await simpleAccountFactory.getAddress(),
+        [await smartAccountV3.getAddress(), await b3tr.getAddress()], // V3 initialization args
+        { version: 3 } // specify V3 initialization
+      )) as SimpleAccountFactory;
+
+      // Check addresses after upgrade
+      const user1AddressV3 = await simpleAccountFactoryV3.getAccountAddress(
+        await user1.getAddress()
+      );
+      const user2AddressV3 = await simpleAccountFactoryV3.getAccountAddress(
+        await user2.getAddress()
+      );
+      const user3AddressV3 = await simpleAccountFactoryV3.getAccountAddress(
+        await user3.getAddress()
+      );
+      const user4AddressV3 = await simpleAccountFactoryV3.getAccountAddress(
+        await user4.getAddress()
+      );
+      const user5AddressV3 = await simpleAccountFactoryV3.getAccountAddress(
+        await user5.getAddress()
+      );
+      const user6AddressV3 = await simpleAccountFactoryV3.getAccountAddress(
+        await user6.getAddress()
+      );
+
+      // Verify addresses
+      expect(user1AddressV3).to.equal(user1AddressV1); // has b3tr balance
+      expect(user2AddressV3).to.not.equal(user2AddressV1); // should be different (no balance/deployment)
+      expect(user3AddressV3).to.equal(user3AddressV1); // deployed
+      expect(user4AddressV3).to.equal(user4AddressV1); // deployed
+      expect(user5AddressV3).to.equal(user5AddressV1); // has ETH balance
+
+      // Create accounts for user2, user5 and user6 (should be V3)
+      await simpleAccountFactoryV3.createAccount(await user2.getAddress());
+      await simpleAccountFactoryV3.createAccount(await user5.getAddress());
+      await simpleAccountFactoryV3.createAccount(await user6.getAddress());
+
+      // Create account for user1 (should be V1 since had b3tr)
+      await simpleAccountFactoryV3.createAccount(await user1.getAddress());
+
+      // Now check versions after ALL accounts are created
+      const accounts = [
+        {
+          address: user1AddressV3,
+          expectedVersion: 1,
+          user: user1,
+          note: "user1 has b3tr",
+        },
+        {
+          address: user2AddressV3,
+          expectedVersion: 3,
+          user: user2,
+          note: "user2 has no balance",
+        },
+        {
+          address: user3AddressV3,
+          expectedVersion: 1,
+          user: user3,
+          note: "user3 has balance and has account",
+        },
+        {
+          address: user4AddressV3,
+          expectedVersion: 1,
+          user: user4,
+          note: "user4 has no balance but has account",
+        },
+        {
+          address: user5AddressV3,
+          expectedVersion: 1,
+          user: user5,
+          note: "user5 has ETH",
+        },
+        {
+          address: user6AddressV3,
+          expectedVersion: 3,
+          user: user6,
+          note: "user6 has no balance (new user after upgrade)",
+        },
+      ];
+
+      for (const { address, expectedVersion, user } of accounts) {
+        const account = await ethers.getContractAt("SimpleAccount", address);
+
+        if (expectedVersion === 1) {
+          try {
+            await account.version();
+
+            // this point should not be reached because it is a legacy account
+            expect(false).to.be.true;
+          } catch {
+            // expect to fail because it is a legacy account
+            expect(true).to.be.true;
+          }
+
+          // Should need upgrade
+          expect(
+            await simpleAccountFactoryV3.accountNeedsUpgradeToVersion(
+              address,
+              3
+            )
+          ).to.be.true;
+        } else {
+          expect(await account.version()).to.equal(3n);
+          expect(
+            await simpleAccountFactoryV3.accountNeedsUpgradeToVersion(
+              address,
+              3
+            )
+          ).to.be.false;
+        }
+      }
+    });
+
+    it("emits Initialized event when upgrading to V3", async () => {
+      const { deployer, b3tr } = await getOrDeployContracts(true);
+
+      // First create a V1 factory and account
+      const factoryProxy = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        []
+      )) as SimpleAccountFactoryV1;
+
+      // Upgrade factory to V2
+      await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactoryV2",
+        await factoryProxy.getAddress(),
+        []
+      );
+
+      // Deploy V3 implementation contracts
+      const FactoryV3 = await ethers.getContractFactory("SimpleAccountFactory");
+      const implementationV3 = await FactoryV3.deploy();
+      await implementationV3.waitForDeployment();
+
+      // Get the V2 contract instance
+      const factoryV2 = await ethers.getContractAt(
+        "SimpleAccountFactoryV2",
+        await factoryProxy.getAddress()
+      );
+
+      // Prepare initialization data
+      const initData = FactoryV3.interface.encodeFunctionData("initializeV3", [
+        await implementationV3.getAddress(),
+        await b3tr.getAddress(),
+      ]);
+
+      // Perform the upgrade manually and check for the event
+      await expect(
+        factoryV2.upgradeToAndCall(
+          await implementationV3.getAddress(),
+          initData
+        )
+      )
+        .to.emit(factoryV2, "Initialized")
+        .withArgs(3);
     });
   });
 

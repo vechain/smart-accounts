@@ -51,7 +51,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  */
 contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     event AccountCreated(SimpleAccount account, address owner, uint256 salt);
-    event ContractReinitialized(uint256 version);
 
     /// @notice The v1 of the simple account implementation (before any upgrade)
     SimpleAccount public accountImplementationV1;
@@ -90,13 +89,17 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         address newImplementationV3,
         address b3trToken
     ) public reinitializer(3) {
+        require(
+            newImplementationV3 != address(0),
+            "Invalid implementation address"
+        );
+        require(b3trToken != address(0), "Invalid B3TR token address");
+
         // Store the new implementation address
         accountImplementationV3 = SimpleAccount(payable(newImplementationV3));
 
         // Set the B3TR token address
         b3tr = IERC20(b3trToken);
-
-        emit ContractReinitialized(3);
     }
 
     // ---------- Authorizers ---------- //
