@@ -21,9 +21,12 @@ export const Readme = () => {
         <VStack align="stretch" gap={4} px={isDesktop ? 20 : 4} spacing={4}>
           <VStack align="center" spacing={4}>
             <Heading size={"lg"} mt={4}>
-              Tech
+              Smart Accounts for Social Login
             </Heading>
-            {/* <Text mt={4}>Account Abstraction for the vechain ecosystem.</Text> */}
+            <Text mt={4}>
+              A simplified version of the Account Abstraction pattern for the
+              VeChain blockchain.
+            </Text>
           </VStack>
 
           {/* <HStack justify="space-between">
@@ -54,16 +57,46 @@ export const Readme = () => {
             </div>
           </HStack> */}
 
-          <Text>There are 2 contracts:</Text>
+          <Text>The system consists of 2 main contracts working together:</Text>
 
           <List spacing={3} styleType="disc">
             <ListItem>
-              <Text as="b">SimpleAccount</Text>: Is the abstracted account of
-              the user.
+              <Text as="b">SimpleAccount</Text>: A smart contract wallet owned
+              by the user that can:
+              <List ml={5} mt={2} spacing={2} styleType="circle">
+                <ListItem>
+                  Execute transactions directly from the owner or through signed
+                  messages
+                </ListItem>
+                <ListItem>Handle both single and batch transactions</ListItem>
+                <ListItem>Be upgraded by the owner</ListItem>
+                <ListItem>Transfer ownership to another address</ListItem>
+                <ListItem>
+                  Use time-based validity windows for transactions
+                </ListItem>
+                <ListItem>
+                  Prevent replay attacks using nonces for batch transactions
+                </ListItem>
+              </List>
             </ListItem>
             <ListItem>
-              <Text as="b">SimpleAccountFactory</Text>: Factory contract to
-              create SimpleAccount contracts on demand.
+              <Text as="b">SimpleAccountFactory</Text>: Factory contract that
+              creates and manages SimpleAccount contracts:
+              <List ml={5} mt={2} spacing={2} styleType="circle">
+                <ListItem>
+                  Creates new accounts with deterministic addresses using
+                  CREATE2
+                </ListItem>
+                <ListItem>
+                  Supports multiple accounts per owner through custom salts
+                </ListItem>
+                <ListItem>
+                  Manages different versions of the SimpleAccount implementation
+                </ListItem>
+                <ListItem>
+                  Maintains compatibility with legacy accounts
+                </ListItem>
+              </List>
             </ListItem>
           </List>
 
@@ -73,13 +106,54 @@ export const Readme = () => {
             compatibility.
           </Text>
 
+          <Divider />
+
+          <Heading size="md">Version Management</Heading>
           <Text>
-            Owner of the Simple Account can execute transactions called directly
-            from him or authorized via signatures and broadcasted by a third
-            party.
+            The system has evolved through multiple versions to improve
+            functionality and security:
+          </Text>
+
+          <List spacing={3} styleType="disc">
+            <ListItem>
+              <Text as="b">SimpleAccount</Text>:
+              <List ml={5} mt={2} spacing={2} styleType="circle">
+                <ListItem>
+                  V1: Basic account functionality with single transaction
+                  execution
+                </ListItem>
+                <ListItem>
+                  V2: Skipped for misconfiguration during upgrade
+                </ListItem>
+                <ListItem>
+                  V3: Introduced batch transactions with nonce-based replay
+                  protection, ownership transfer and version tracking
+                </ListItem>
+              </List>
+            </ListItem>
+            <ListItem>
+              <Text as="b">SimpleAccountFactory</Text>:
+              <List ml={5} mt={2} spacing={2} styleType="circle">
+                <ListItem>V1: Basic account creation and management</ListItem>
+                <ListItem>
+                  V2: Added support for multiple accounts per owner using custom
+                  salts
+                </ListItem>
+                <ListItem>
+                  V3: Support for V3 SimpleAccounts, enhanced version management
+                  and backward compatibility with legacy accounts
+                </ListItem>
+              </List>
+            </ListItem>
+          </List>
+
+          <Text>
+            The factory maintains compatibility with all account versions,
+            ensuring a smooth experience across different dApps and versions.
           </Text>
 
           <Divider />
+
           <Text>
             The contracts are deployed on the following networks:
             <List spacing={3} styleType="disc">
@@ -93,19 +167,19 @@ export const Readme = () => {
           </Text>
 
           <Text>
-            You can look at the code of the contracts in the{" "}
+            For detailed documentation and implementation details, check out the{" "}
             <Link
               fontWeight={"bold"}
               isExternal
-              href="https://github.com/vechain/smart-accounts-factory/tree/main/packages/contracts/contracts"
+              href="https://github.com/vechain/smart-accounts"
             >
-              Smart Accounts Factory
+              Github repository
               <Icon as={FaExternalLinkAlt} />
-            </Link>{" "}
-            repository.
+            </Link>
           </Text>
+
           <Text>
-            Implement the Smart Account in your app with{" "}
+            Implement the Social Login with Smart Accounts in your app with{" "}
             <Link
               fontWeight={"bold"}
               isExternal

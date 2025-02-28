@@ -133,6 +133,9 @@
     "test:hardhat": {
       "cache": false,
       "dependsOn": ["@repo/config#check-or-generate-local-config"]
+    },
+    "generate-docs": {
+      "cache": false
     }
   }
 }

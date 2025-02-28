@@ -37,9 +37,9 @@ export const Home = () => {
         </CardBody>
       </Card>
 
-      <SupportedProject />
-
       <Readme />
+
+      <SupportedProject />
     </VStack>
   );
 };

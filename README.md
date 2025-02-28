@@ -1,54 +1,85 @@
-# VeChain Smart Accounts Factory
+# Smart accounts for social login
 
-<div align="center">
-  <img src="apps/frontend/src/assets/logo.png" alt="Logo" width="200"/>
+Try out the live demo [here](https://vechain.github.io/smart-accounts-factory/).
 
-  <p>Simplified version of the <a href="https://github.com/eth-infinitism/account-abstraction" target="_blank">Account Abstraction pattern<a> for the vechain blockchain.</p>
-</div>
+## Overview
 
-View the online version of the project [here](https://vechain.github.io/smart-accounts-factory/).
+This is a simplified version of the [Account Abstraction pattern](https://eips.ethereum.org/EIPS/eip-4337) for the vechain blockchain.
+Concepts like `UserOperation`, `Bundler`, and `EntryPoint` are not implemented, only the basic account abstraction pattern is implemented,
+in order to provide a light-weight solution for social login and for developers.
 
-There are 2 contracts (that you can find in the `packages/contracts/contracts` folder):
+Currently the smart accounts created through this factory are used to enable social login on VeChain.
 
-- **SimpleAccount**: Is the abstracted account of the user.
-- **SimpleAccountFactory**: Factory contract to create SimpleAccount contracts on demand.
+## Addresses
 
-You can fork the contracts and deploy them on your own, but we recommend using the contracts deployed by us for a better cross-app compatibility.
+### Mainnet
 
-Owner of the Simple Account can execute transactions called directly from him or authorized via signatures and broadcasted by a third party.
+[0xC06Ad8573022e2BE416CA89DA47E8c592971679A](https://vechainstats.com/account/0xc06ad8573022e2be416ca89da47e8c592971679a/)
 
-### Mainnet Address
+### Testnet
 
-- SimpleAccountFactory: `0xC06Ad8573022e2BE416CA89DA47E8c592971679A`
+[0x7EABA81B4F3741Ac381af7e025f3B6e0428F05Fb](https://explore-testnet.vechain.org/accounts/0x7eaba81b4f3741ac381af7e025f3b6e0428f05fb)
 
-### Testnet Address
+## How it works
 
-- SimpleAccountFactory: `0x7EABA81B4F3741Ac381af7e025f3B6e0428F05Fb`
+There are 2 contracts that work together to enable social login and account abstraction:
 
-## Run the project
+- **SimpleAccount**: A smart contract wallet owned by the user that can:
 
-Ensure your development environment is set up with the following:
+  - Execute transactions directly from the owner or through signed messages
+  - Handle both single and batch transactions
+  - Be upgraded by the owner
+  - Transfer ownership to another address
+  - Use time-based validity windows for transactions
+  - Prevent replay attacks using nonces for batch transactions
 
-- **Node.js (v18 or later):** [Download here](https://nodejs.org/en/download/package-manager) 📥
-- **Yarn:** [Install here](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable) 🧶
-- **Docker (for containerization):** [Get Docker](https://docs.docker.com/get-docker/) 🐳
-- **Hardhat (for smart contracts):** [Getting Started with Hardhat](https://hardhat.org/hardhat-runner/docs/getting-started) ⛑️
+- **SimpleAccountFactory**: Factory contract that creates and manages SimpleAccount contracts:
+  - Creates new accounts with deterministic addresses using CREATE2
+  - Supports multiple accounts per owner through custom salts
+  - Manages different versions of the SimpleAccount implementation
+  - Maintains compatibility with legacy accounts
+
+### Transaction Flow
+
+1. **Account Creation**: When a user wants to create a smart account, they interact with the SimpleAccountFactory, which creates a new SimpleAccount instance with the user as the owner.
+
+2. **Transaction Execution**: The SimpleAccount can execute transactions in several ways:
+
+   - Direct execution by the owner
+   - Batch execution of multiple transactions
+   - Signature-based execution (useful for social login)
+   - Batch signature-based execution with replay protection (useful for social login + multiclause)
+
+3. **Social Login Integration**: This system enables social login by creating deterministic account addresses for each user and allowing transactions to be signed off-chain and executed by anyone. This creates a seamless experience where users can interact with dApps using their social credentials.
+
+### Version Management
+
+The system has evolved through multiple versions to improve functionality and security:
+
+- **SimpleAccount**:
+
+  - V1: Basic account functionality with single transaction execution
+  - V2: _Skipped for misconfiguration during upgrade_
+  - V3: Introduced batch transactions with nonce-based replay protection, ownership transfer and version tracking
+
+- **SimpleAccountFactory**:
+  - V1: Basic account creation and management
+  - V2: Added support for multiple accounts per owner using custom salts
+  - V3: Support for V3 SimpleAccounts, enhanced version management and backward compatibility with legacy accounts
+
+The factory maintains compatibility with all account versions, ensuring a smooth experience across different dApps and versions.
+
+You can fork the contracts and deploy them on your own, **but we recommend using our deployed contracts for a better cross-app compatibility**.
 
 ## Project Structure
 
 ### Frontend (apps/frontend) 🌐
 
-A blazing-fast React application powered by Vite:
-
-- **Vechain dapp-kit:** Streamline wallet connections and interactions. [Learn more](https://docs.vechain.org/developer-resources/sdks-and-providers/dapp-kit)
+There's a frontend (powered by React/Vite) that shows useful information about how the smart accounts are being used. It also offers a convenient way to interact with and view statistics for the deployed contracts.
 
 ### Contracts (packages/contracts) 📜
 
-Smart contract in Solidity, managed with Hardhat for deployment on the Vechain Thor network.
-
-### Packages 📦
-
-Shared configurations and utility functions to unify and simplify your development process.
+The smart contracts in this project are managed using Hardhat, specifically configured to work with the VeChain Thor network. This setup allows you to compile, test, and deploy the contracts seamlessly to VeChain testnet or mainnet environments.
 
 ### Getting Started
 
@@ -60,24 +91,39 @@ yarn # Run this at the root level of the project
 
 Place your `.env` files in the root folder, you can copy `.env.example` file and rename it to `.env` changing the values to your own.
 
-## Running the frontend with the deployed contracts
+### Run the whole project (frontend + contracts):
+
+The following commands will check if the contracts are alrady deployed on the selected network, if not it will deploy them, then start the frontend web app.
 
 ```bash
   yarn dev:mainnet
 ```
 
-## Deploy the contracts by yourself
+```bash
+  yarn dev:testnet
+```
 
-### Deploy the contracts on the Testnet:
+### Deploy contracts:
 
 ```bash
   yarn contracts:deploy:testnet
 ```
 
-### Run the frontend to interact with the contracts on the Testnet:
+### Run tests
 
 ```bash
-  yarn dev:testnet
+  yarn contracts:test
 ```
 
-<img src="apps/frontend/src/assets/privy-aa-fee.png" alt="privy-aa-fee"/>
+### Generate documentation
+
+```bash
+  yarn contracts:generate-docs
+```
+
+## Documentation
+
+Detailed documentation for the smart contracts is available:
+
+- [SimpleAccount Documentation](./packages/contracts/docs/accounts/SimpleAccount.md) - Complete API reference and implementation details for the SimpleAccount contract
+- [SimpleAccountFactory Documentation](./packages/contracts/docs/accounts/SimpleAccountFactory.md) - Complete API reference and implementation details for the SimpleAccountFactory contract

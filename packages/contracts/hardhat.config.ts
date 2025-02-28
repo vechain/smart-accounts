@@ -90,6 +90,9 @@ module.exports = {
   },
   docgen: {
     pages: "files",
+    exclude: ["core", "deprecated", "interfaces", "mocks", "utils"],
+    clear: true,
+    runOnCompile: true,
   },
 };
 
