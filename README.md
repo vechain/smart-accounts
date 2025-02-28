@@ -4,6 +4,15 @@
 
 Try out the live demo [here](https://vechain.github.io/smart-accounts/).
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Addresses](#addresses)
+- [How it works](#how-it-works)
+- [Version Management](#version-management)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+
 ## Overview
 
 This is a simplified version of the [Account Abstraction pattern](https://eips.ethereum.org/EIPS/eip-4337) for the vechain blockchain.
@@ -54,7 +63,7 @@ There are 2 contracts that work together to enable social login and account abst
 
 3. **Social Login Integration**: This system enables social login by creating deterministic account addresses for each user and allowing transactions to be signed off-chain and executed by anyone. This creates a seamless experience where users can interact with dApps using their social credentials.
 
-### Version Management
+## Version Management
 
 The system has evolved through multiple versions to improve functionality and security:
 
@@ -83,7 +92,7 @@ There's a frontend (powered by React/Vite) that shows useful information about h
 
 The smart contracts in this project are managed using Hardhat, specifically configured to work with the VeChain Thor network. This setup allows you to compile, test, and deploy the contracts seamlessly to VeChain testnet or mainnet environments.
 
-### Getting Started
+## Getting Started
 
 Clone the repository and install dependencies with ease:
 
@@ -91,7 +100,7 @@ Clone the repository and install dependencies with ease:
 yarn # Run this at the root level of the project
 ```
 
-Place your `.env` files in the root folder, you can copy `.env.example` file and rename it to `.env` changing the values to your own.
+Place your `.env` files in the root folder, you can copy `.env.example`
 
 ### Run the whole project (frontend + contracts):
 
