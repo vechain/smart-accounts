@@ -1,5 +1,7 @@
 # Smart accounts for social login
 
+[![codecov](https://codecov.io/gh/vechain/smart-accounts/graph/badge.svg?token=3OMYFKUMS9)](https://app.codecov.io/gh/vechain/smart-accounts)
+
 Try out the live demo [here](https://vechain.github.io/smart-accounts/).
 
 ## Overview
