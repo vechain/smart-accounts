@@ -44,6 +44,10 @@ contract SimpleAccount is
     mapping(bytes32 => bool) public usedNonces;
 
     event SimpleAccountInitialized(address indexed owner);
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
 
     // ---------- Initializer ---------- //
 
@@ -246,6 +250,13 @@ contract SimpleAccount is
      * @param newOwner the new owner of the account
      */
     function transferOwnership(address newOwner) public onlyOwner {
+        require(
+            newOwner != address(0),
+            "Cannot transfer ownership to the zero address"
+        );
+
+        emit OwnershipTransferred(owner, newOwner);
+
         owner = newOwner;
     }
 
