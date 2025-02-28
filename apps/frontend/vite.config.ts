@@ -32,6 +32,6 @@ export default defineConfig(({ mode }) => {
         resolve(__dirname, "test/setup/resizeObserverMock.ts"),
       ],
     },
-    base: mode === "production" ? "/smart-accounts-factory/" : "/",
+    base: mode === "production" ? "/smart-accounts/" : "/",
   };
 });

@@ -1,3 +1,4 @@
+# Simple workflow for deploying static content to GitHub Pages
 name: Deploy to GitHub Pages
 
 on:
@@ -29,16 +30,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install Dependencies
-        run: yarn install
-
-      - name: Build
-        run: yarn build:mainnet
+      - name: Build App
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: |
+          yarn install
+          yarn build:mainnet
 
       - name: Fix permissions
         run: |
