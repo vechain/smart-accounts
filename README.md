@@ -151,4 +151,4 @@ Detailed documentation for the smart contracts is available:
 
 Implement the Social Login with Smart Accounts in your app with [VeChain Kit](https://github.com/vechain/vechain-kit).
 
-Documentation and examples are available in the [VeChain Kit Docs](https://docs.vechain-kit.vechain.org).
+Documentation and examples are available in the [VeChain Kit Docs](https://docs.vechainkit.vechain.org).
