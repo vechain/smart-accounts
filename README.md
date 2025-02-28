@@ -1,6 +1,6 @@
 # Smart accounts for social login
 
-Try out the live demo [here](https://vechain.github.io/smart-accounts-factory/).
+Try out the live demo [here](https://vechain.github.io/smart-accounts/).
 
 ## Overview
 
