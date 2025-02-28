@@ -100,6 +100,29 @@ export const Readme = () => {
             </ListItem>
           </List>
 
+          <Text fontWeight="medium" mt={4}>
+            Important Note about Nonces:
+          </Text>
+          <Text>
+            When using executeBatchWithAuthorization, proper nonce management is
+            crucial to protect users against replay attacks:
+            <List ml={5} mt={2} spacing={2} styleType="circle">
+              <ListItem>
+                Generate the nonce when requesting the signature (recommended to
+                use Date.now())
+              </ListItem>
+              <ListItem>Each nonce can only be used once per account</ListItem>
+              <ListItem>
+                Without proper nonce management, signed transactions could be
+                replayed multiple times by malicious actors
+              </ListItem>
+              <ListItem>
+                Nonces are only required and validated for the
+                executeBatchWithAuthorization method
+              </ListItem>
+            </List>
+          </Text>
+
           <Text>
             You can fork the contracts and deploy them on your own, but we
             recommend using the contracts deployed by us for a better cross-app

@@ -61,7 +61,15 @@ There are 2 contracts that work together to enable social login and account abst
    - Signature-based execution (useful for social login)
    - Batch signature-based execution with replay protection (useful for social login + multiclause)
 
-3. **Social Login Integration**: This system enables social login by creating deterministic account addresses for each user and allowing transactions to be signed off-chain and executed by anyone. This creates a seamless experience where users can interact with dApps using their social credentials.
+3. **Nonce Management**: For batch transactions with authorization (executeBatchWithAuthorization), a nonce is required to protect users against replay attacks:
+
+   - The nonce should be generated when requesting the signature
+   - Best practice is to use `Date.now()` as the nonce value
+   - Each nonce can only be used once per account
+   - Without proper nonce management, malicious actors could replay the same signed transaction multiple times
+   - Nonces are only used and required for executeBatchWithAuthorization method
+
+4. **Social Login Integration**: This system enables social login by creating deterministic account addresses for each user and allowing transactions to be signed off-chain and executed by anyone. This creates a seamless experience where users can interact with dApps using their social credentials.
 
 ## Version Management
 
