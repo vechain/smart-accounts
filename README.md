@@ -127,3 +127,9 @@ Detailed documentation for the smart contracts is available:
 
 - [SimpleAccount Documentation](./packages/contracts/docs/accounts/SimpleAccount.md) - Complete API reference and implementation details for the SimpleAccount contract
 - [SimpleAccountFactory Documentation](./packages/contracts/docs/accounts/SimpleAccountFactory.md) - Complete API reference and implementation details for the SimpleAccountFactory contract
+
+## Social Login with Smart Accounts
+
+Implement the Social Login with Smart Accounts in your app with [VeChain Kit](https://github.com/vechain/vechain-kit).
+
+Documentation and examples are available in the [VeChain Kit Docs](https://docs.vechain-kit.vechain.org).
