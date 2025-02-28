@@ -115,6 +115,14 @@ The following commands will check if the contracts are alrady deployed on the se
   yarn contracts:test
 ```
 
+### Run tests with coverage
+
+```bash
+  yarn contracts:test:coverage
+```
+
+Open the coverage report in the `packages/contracts/coverage/index.html` file in your browser to see the test coverage.
+
 ### Generate documentation
 
 ```bash

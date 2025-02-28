@@ -60,3 +60,6 @@ packages/contracts/.openzeppelin/unknown-246.json
 .env.solo
 
 *.cookie
+
+packages/contracts/coverage/
+

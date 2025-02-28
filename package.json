@@ -23,7 +23,8 @@
     "solo-down": "make solo-down",
     "solo-clean": "make solo-clean",
     "contracts:test": "dotenv -v NEXT_PUBLIC_APP_ENV=local -- turbo run test:hardhat --filter=contracts",
-    "contracts:generate-docs": "dotenv -v NEXT_PUBLIC_APP_ENV=local -- turbo run generate-docs --filter=contracts"
+    "contracts:generate-docs": "dotenv -v NEXT_PUBLIC_APP_ENV=local -- turbo run generate-docs --filter=contracts",
+    "test:coverage:solidity": "dotenv -v NEXT_PUBLIC_APP_ENV=local -v IS_TEST_COVERAGE=true -e .env.example turbo run test:coverage:solidity"
   },
   "devDependencies": {
     "prettier": "^3.2.5",
