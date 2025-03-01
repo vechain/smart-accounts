@@ -735,15 +735,7 @@ describe("SimpleAccount", () => {
         "0x"
       );
 
-      try {
-        await smartAccount.version();
-
-        // this point should not be reached because it is a legacy account
-        expect(false).to.be.true;
-      } catch {
-        // expect to fail because it is a legacy account
-        expect(true).to.be.true;
-      }
+      await expect(smartAccount.version()).to.be.reverted;
 
       // check if upgrade is needed (it should since it was created with V1 of factory)
       expect(

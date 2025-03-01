@@ -3,6 +3,7 @@ import { getOrDeployContracts } from "./helpers/deploy";
 import { ethers } from "hardhat";
 import { getImplementationAddress } from "@openzeppelin/upgrades-core";
 import {
+  deployAndUpgrade,
   deployProxy,
   getInitializerData,
   upgradeProxy,
@@ -13,6 +14,7 @@ import {
   SimpleAccountFactoryV1,
   SimpleAccountFactoryV2,
 } from "../typechain-types";
+import { ZeroAddress } from "ethers";
 
 describe("SimpleAccountFactory", () => {
   describe("Deployment", () => {
@@ -96,6 +98,27 @@ describe("SimpleAccountFactory", () => {
         "SimpleAccountFactory", // Use V3 interface
         await proxy.getAddress()
       );
+    });
+
+    it("Factory is initialized correctly", async () => {
+      const { simpleAccountFactory, deployer } =
+        await getOrDeployContracts(true);
+
+      const simpleAccountImplementationAddress =
+        await simpleAccountFactory.accountImplementationV3();
+      expect(simpleAccountImplementationAddress).to.not.equal(
+        "0x0000000000000000000000000000000000000000"
+      );
+
+      // role is correctly granted to deployer
+      const DEFAULT_ADMIN_ROLE =
+        await simpleAccountFactory.DEFAULT_ADMIN_ROLE();
+      expect(
+        await simpleAccountFactory.hasRole(
+          DEFAULT_ADMIN_ROLE,
+          await deployer.getAddress()
+        )
+      ).to.be.true;
     });
   });
 
@@ -183,7 +206,7 @@ describe("SimpleAccountFactory", () => {
       );
     });
 
-    it("cannot initialize or reinitialize the contract", async () => {
+    it("cannot reinitialize the contract", async () => {
       const { simpleAccountFactory, deployer, b3tr } =
         await getOrDeployContracts(true);
 
@@ -366,6 +389,46 @@ describe("SimpleAccountFactory", () => {
       expect(version).to.equal(3n);
     });
 
+    it("Cannot initializeV3 with wrong args", async () => {
+      // Deploy the V3 version of SimpleAccount separately because we will need it
+      // when reinitializing the SimpleAccountFactory v3
+      const SimpleAccount = await ethers.getContractFactory("SimpleAccount");
+      const simpleAccountImpl = await SimpleAccount.deploy();
+      await simpleAccountImpl.waitForDeployment();
+
+      // Test first case with ZeroAddress
+      await expect(
+        deployAndUpgrade(
+          [
+            "SimpleAccountFactoryV1",
+            "SimpleAccountFactoryV2",
+            "SimpleAccountFactory",
+          ],
+          [[], [], [await simpleAccountImpl.getAddress(), ZeroAddress]],
+          {
+            versions: [undefined, 2, 3],
+            logOutput: false,
+          }
+        )
+      ).to.be.reverted;
+
+      // Test second case with wrong address
+      await expect(
+        deployAndUpgrade(
+          [
+            "SimpleAccountFactoryV1",
+            "SimpleAccountFactoryV2",
+            "SimpleAccountFactory",
+          ],
+          [[], [], [ZeroAddress, await simpleAccountImpl.getAddress()]],
+          {
+            versions: [undefined, 2, 3],
+            logOutput: false,
+          }
+        )
+      ).to.be.reverted;
+    });
+
     /**
      * Having a V3 of SimpleAccount means that the implementation address inside the factory changes, which causes the
      * address calculation through the "Create2" function to resolve to a different account.
@@ -443,12 +506,6 @@ describe("SimpleAccountFactory", () => {
       // user1: generates address and receives b3tr
       await b3tr.transfer(user1AddressV1, ethers.parseEther("1"));
 
-      // After sending B3TR to user1's address
-      console.log(
-        "User1 B3TR balance before creation:",
-        await b3tr.balanceOf(user1AddressV1)
-      );
-
       // user2: generates address only (no action needed)
 
       // user3: gen addr, receives b3tr and creates account
@@ -463,12 +520,6 @@ describe("SimpleAccountFactory", () => {
         to: user5AddressV1,
         value: ethers.parseEther("1"),
       });
-
-      // After sending ETH to user5's address
-      console.log(
-        "User5 ETH balance before creation:",
-        await ethers.provider.getBalance(user5AddressV1)
-      );
 
       // Upgrade factory to V3
       const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
@@ -562,15 +613,7 @@ describe("SimpleAccountFactory", () => {
         const account = await ethers.getContractAt("SimpleAccount", address);
 
         if (expectedVersion === 1) {
-          try {
-            await account.version();
-
-            // this point should not be reached because it is a legacy account
-            expect(false).to.be.true;
-          } catch {
-            // expect to fail because it is a legacy account
-            expect(true).to.be.true;
-          }
+          await expect(account.version()).to.be.reverted;
 
           // Should need upgrade
           expect(
@@ -828,16 +871,14 @@ describe("SimpleAccountFactory", () => {
       const b3trBalanceAfter3 = await b3tr.balanceOf(smartAccountAddress);
       expect(b3trBalanceAfter3).to.equal(ethers.parseEther("0"));
 
-      try {
-        const legacySmartAccount = await ethers.getContractAt(
-          "SimpleAccount",
-          await simpleAccountFactoryV3.getAccountAddress(
-            await legacySmartAccountOwner.getAddress()
-          )
-        );
-      } catch {
-        console.log("LEGACY ACCOUNT VERSION 1");
-      }
+      const legacySmartAccount = await ethers.getContractAt(
+        "SimpleAccount",
+        await simpleAccountFactoryV3.getAccountAddress(
+          await legacySmartAccountOwner.getAddress()
+        )
+      );
+
+      await expect(legacySmartAccount.version()).to.be.reverted;
 
       // If I generate an address now, it should not be legacy, and it should keep not being legacy after I transfer ETH
       const newAddress = await simpleAccountFactoryV3.getAccountAddress(
@@ -877,12 +918,7 @@ describe("SimpleAccountFactory", () => {
         legacyWithoutDeploymentAccountAddress
       );
 
-      try {
-        await legacyWithoutDeploymentAccount.version();
-
-        // should not be able to get the version
-        expect(false).to.be.true;
-      } catch {}
+      await expect(legacyWithoutDeploymentAccount.version()).to.be.reverted;
 
       const implementationV3Address =
         await simpleAccountFactoryV3.accountImplementationV3();
