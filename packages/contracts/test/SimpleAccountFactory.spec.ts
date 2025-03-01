@@ -21,6 +21,82 @@ describe("SimpleAccountFactory", () => {
       const version = await simpleAccountFactory.version();
       expect(version).to.equal(3n);
     });
+
+    it("should be able to deploy and upgrade all versions", async () => {
+      const [deployer, ...otherAccounts] = await ethers.getSigners();
+
+      // Deploy the B3TR mocked token
+      const B3TR = await ethers.getContractFactory("B3TR_Mock");
+      const b3tr = await B3TR.deploy();
+      await b3tr.waitForDeployment();
+
+      // --- Deploy the SimpleAccountFactoryV1 ---
+      const SimpleAccountFactoryV1 = await ethers.getContractFactory(
+        "SimpleAccountFactoryV1"
+      );
+      const smartAccountFactoryImplV1 = await SimpleAccountFactoryV1.deploy();
+      await smartAccountFactoryImplV1.waitForDeployment();
+
+      // Deploy the proxy contract, link it to the implementation and call the initializer
+      const proxyFactory = await ethers.getContractFactory("AAProxy");
+      const proxy = (await proxyFactory.deploy(
+        await smartAccountFactoryImplV1.getAddress(),
+        getInitializerData(SimpleAccountFactoryV1.interface, [], undefined)
+      )) as SimpleAccountFactory;
+      await proxy.waitForDeployment();
+
+      // --- Deploy the SimpleAccountFactoryV2 ---
+      const SimpleAccountFactoryV2 = await ethers.getContractFactory(
+        "SimpleAccountFactoryV2"
+      );
+      const smartAccountFactoryImplV2 = await SimpleAccountFactoryV2.deploy();
+      await smartAccountFactoryImplV2.waitForDeployment();
+
+      // Get the proxy with V1 ABI to perform the upgrade
+      const proxyV1 = await ethers.getContractAt(
+        "SimpleAccountFactoryV1",
+        await proxy.getAddress()
+      );
+
+      // Upgrade to V2 without initialization data since V2 doesn't need initialization
+      await proxyV1.upgradeToAndCall(
+        await smartAccountFactoryImplV2.getAddress(),
+        "0x"
+      );
+
+      // --- Deploy the SimpleAccountFactoryV3 ---
+      const SimpleAccount = await ethers.getContractFactory("SimpleAccount");
+      const simpleAccountImpl = await SimpleAccount.deploy();
+      await simpleAccountImpl.waitForDeployment();
+
+      const SimpleAccountFactoryV3 = await ethers.getContractFactory(
+        "SimpleAccountFactory"
+      );
+      const smartAccountFactoryImplV3 = await SimpleAccountFactoryV3.deploy();
+      await smartAccountFactoryImplV3.waitForDeployment();
+
+      // Get the proxy with V2 ABI to perform the upgrade
+      const proxyV2 = await ethers.getContractAt(
+        "SimpleAccountFactoryV2",
+        await proxy.getAddress()
+      );
+
+      // Upgrade to V3 with initialization data
+      await proxyV2.upgradeToAndCall(
+        await smartAccountFactoryImplV3.getAddress(),
+        getInitializerData(
+          SimpleAccountFactoryV3.interface,
+          [await simpleAccountImpl.getAddress(), await b3tr.getAddress()],
+          3
+        )
+      );
+
+      // Get the proxy with V3 interface
+      const proxyV3 = await ethers.getContractAt(
+        "SimpleAccountFactory", // Use V3 interface
+        await proxy.getAddress()
+      );
+    });
   });
 
   describe("Contract upgradeablity", () => {
@@ -997,6 +1073,60 @@ describe("SimpleAccountFactory", () => {
       );
       const owner = await smartAccountContract.owner();
       expect(owner).to.equal(await smartAccountOwner.getAddress());
+    });
+
+    it("should return existing account if already deployed", async () => {
+      const { simpleAccountFactory, otherAccounts } =
+        await getOrDeployContracts(true);
+
+      // Create account first time
+      const owner = otherAccounts[0];
+      const expectedAddress = await simpleAccountFactory.getAccountAddress(
+        await owner.getAddress()
+      );
+      console.log("Expected account address:", expectedAddress);
+
+      // Check initial state
+      const codeBefore = await ethers.provider.getCode(expectedAddress);
+      console.log("Code length before first creation:", codeBefore.length);
+      console.log("Code before:", codeBefore);
+
+      // First creation
+      await simpleAccountFactory.createAccount(await owner.getAddress());
+
+      // Verify account exists
+      const codeAfter = await ethers.provider.getCode(expectedAddress);
+      console.log("Code length after first creation:", codeAfter.length);
+
+      // Get the contract instance
+      const account = await ethers.getContractAt(
+        "SimpleAccount",
+        expectedAddress
+      );
+      console.log("Account owner:", await account.owner());
+      console.log("Expected owner:", await owner.getAddress());
+
+      // Get the address again - should be the same
+      const addressAfterCreation = await simpleAccountFactory.getAccountAddress(
+        await owner.getAddress()
+      );
+      console.log("Address after creation:", addressAfterCreation);
+      expect(addressAfterCreation).to.equal(expectedAddress);
+
+      // Try to create same account again but just call getAccountAddress first
+      const existingAddress = await simpleAccountFactory.getAccountAddress(
+        await owner.getAddress()
+      );
+      console.log("Existing address before second creation:", existingAddress);
+
+      // Now try the creation
+      await simpleAccountFactory
+        .connect(otherAccounts[1])
+        .getAccountAddress(await owner.getAddress());
+
+      // Verify nothing changed
+      const codeFinal = await ethers.provider.getCode(expectedAddress);
+      expect(codeFinal).to.equal(codeAfter);
     });
   });
 
