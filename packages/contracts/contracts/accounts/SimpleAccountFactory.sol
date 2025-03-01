@@ -7,6 +7,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "./SimpleAccount.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "hardhat/console.sol";
 
 /**
  * @title SimpleAccountFactory
@@ -143,14 +144,35 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
             )
         );
 
+        // We also calculate the address with the V3 implementation (in case the account is V3)
+        address addressGeneratedWithV3 = Create2.computeAddress(
+            bytes32(salt),
+            keccak256(
+                abi.encodePacked(
+                    type(ERC1967Proxy).creationCode,
+                    abi.encode(
+                        address(accountImplementationV3),
+                        abi.encodeCall(SimpleAccount.initialize, (owner))
+                    )
+                )
+            )
+        );
+
+        // We check if the account is legacy or not
+        bool mustUseV1 = _mustUseV1Implementation(addressGeneratedWithV1);
+
+        // Let's check if the account is already deployed (and we use V1 address or V3 address based on the legacy check)
+        address simpleAccountAddress = mustUseV1
+            ? address(addressGeneratedWithV1)
+            : address(addressGeneratedWithV3);
+
         // Check if account already exists
-        if (addressGeneratedWithV1.code.length > 0) {
-            return SimpleAccount(payable(addressGeneratedWithV1));
+        if (simpleAccountAddress.code.length > 0) {
+            return SimpleAccount(payable(simpleAccountAddress));
         }
 
-        address implementationToUse = _mustUseV1Implementation(
-            addressGeneratedWithV1
-        )
+        // If the account is legacy, we use the V1 implementation address, otherwise we use the V3 implementation address
+        address implementationToUse = mustUseV1
             ? address(accountImplementationV1)
             : address(accountImplementationV3);
 
@@ -192,15 +214,35 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
             )
         );
 
+        // We also calculate the address with the V3 implementation (in case the account is V3)
+        address addressGeneratedWithV3 = Create2.computeAddress(
+            bytes32(salt),
+            keccak256(
+                abi.encodePacked(
+                    type(ERC1967Proxy).creationCode,
+                    abi.encode(
+                        address(accountImplementationV3),
+                        abi.encodeCall(SimpleAccount.initialize, (owner))
+                    )
+                )
+            )
+        );
+
+        // We check if the account is legacy or not
+        bool mustUseV1 = _mustUseV1Implementation(addressGeneratedWithV1);
+
+        // Let's check if the account is already deployed (and we use V1 address or V3 address based on the legacy check)
+        address simpleAccountAddress = mustUseV1
+            ? address(addressGeneratedWithV1)
+            : address(addressGeneratedWithV3);
+
         // Check if account already exists
-        if (addressGeneratedWithV1.code.length > 0) {
-            return SimpleAccount(payable(addressGeneratedWithV1));
+        if (simpleAccountAddress.code.length > 0) {
+            return SimpleAccount(payable(simpleAccountAddress));
         }
 
         // For legacy accounts, deploy with V1 implementation
-        address implementationToUse = _mustUseV1Implementation(
-            addressGeneratedWithV1
-        )
+        address implementationToUse = mustUseV1
             ? address(accountImplementationV1)
             : address(accountImplementationV3);
 

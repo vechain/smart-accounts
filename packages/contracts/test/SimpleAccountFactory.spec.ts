@@ -15,6 +15,7 @@ import {
   SimpleAccountFactoryV2,
 } from "../typechain-types";
 import { ZeroAddress } from "ethers";
+import { EventLog } from "ethers";
 
 describe("SimpleAccountFactory", () => {
   describe("Deployment", () => {
@@ -1015,6 +1016,224 @@ describe("SimpleAccountFactory", () => {
       const codeFinal = await ethers.provider.getCode(expectedAddress);
       expect(codeFinal).to.equal(codeAfter);
     });
+
+    it("returns existing account when calling createAccount for already deployed account (with V1)", async () => {
+      const { otherAccounts, b3tr } = await getOrDeployContracts(true);
+      const owner = otherAccounts[0];
+
+      const simpleAccountFactory = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV1;
+
+      // First creation
+      const tx1 = await simpleAccountFactory.createAccount(
+        await owner.getAddress()
+      );
+      const receipt1 = await tx1.wait();
+
+      // Get the account address
+      const accountAddress = await simpleAccountFactory.getAccountAddress(
+        await owner.getAddress()
+      );
+
+      // Now we upgrade the factory to V3
+      const smartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3Contract = await smartAccountV3.deploy();
+      await smartAccountV3Contract.waitForDeployment();
+
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactory",
+        await simpleAccountFactory.getAddress(),
+        [await smartAccountV3Contract.getAddress(), await b3tr.getAddress()], // V3 initialization args
+        { version: 3 } // specify V3 initialization
+      )) as SimpleAccountFactory;
+
+      // Try to create the same account again
+      const tx2 = await simpleAccountFactoryV3.createAccount(
+        await owner.getAddress()
+      );
+      const receipt2 = await tx2.wait();
+
+      // Verify both transactions returned the same address
+      expect(accountAddress).to.equal(
+        await simpleAccountFactoryV3.getAccountAddress(await owner.getAddress())
+      );
+
+      // Verify only one AccountCreated event was emitted (from the first creation)
+      const events1 = receipt1?.logs.filter(
+        (log) =>
+          log.topics[0] ===
+          simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
+      );
+      const events2 = receipt2?.logs.filter(
+        (log) =>
+          log.topics[0] ===
+          simpleAccountFactoryV3.interface.getEvent("AccountCreated").topicHash
+      );
+      expect(events1?.length).to.equal(1);
+      expect(events2?.length).to.equal(0);
+    });
+
+    it("returns existing account when calling createAccount for already deployed account (with V3)", async () => {
+      const { simpleAccountFactory, otherAccounts } =
+        await getOrDeployContracts(true);
+      const owner = otherAccounts[0];
+
+      // First creation
+      const tx1 = await simpleAccountFactory.createAccount(
+        await owner.getAddress()
+      );
+      const receipt1 = await tx1.wait();
+
+      // Get the account address
+      const accountAddress = await simpleAccountFactory.getAccountAddress(
+        await owner.getAddress()
+      );
+
+      // Try to create the same account again
+      const tx2 = await simpleAccountFactory.createAccount(
+        await owner.getAddress()
+      );
+      const receipt2 = await tx2.wait();
+
+      // Verify both transactions returned the same address
+      expect(accountAddress).to.equal(
+        await simpleAccountFactory.getAccountAddress(await owner.getAddress())
+      );
+
+      // Verify only one AccountCreated event was emitted (from the first creation)
+      const events1 = receipt1?.logs.filter(
+        (log) =>
+          log.topics[0] ===
+          simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
+      );
+      const events2 = receipt2?.logs.filter(
+        (log) =>
+          log.topics[0] ===
+          simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
+      );
+      expect(events1?.length).to.equal(1);
+      expect(events2?.length).to.equal(0);
+    });
+
+    it("returns existing account when calling createAccountWithSalt for already deployed account (with V2)", async () => {
+      const { b3tr, otherAccounts } = await getOrDeployContracts(true);
+      const owner = otherAccounts[0];
+      const salt = 12345n;
+
+      const simpleAccountFactory = (await deployProxy(
+        "SimpleAccountFactoryV2",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV2;
+
+      // First creation
+      const tx1 = await simpleAccountFactory.createAccountWithSalt(
+        await owner.getAddress(),
+        salt
+      );
+      const receipt1 = await tx1.wait();
+
+      // Get the account address
+      const accountAddress =
+        await simpleAccountFactory.getAccountAddressWithSalt(
+          await owner.getAddress(),
+          salt
+        );
+
+      // Now we upgrade the factory to V3
+      const smartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3Contract = await smartAccountV3.deploy();
+      await smartAccountV3Contract.waitForDeployment();
+
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV2",
+        "SimpleAccountFactory",
+        await simpleAccountFactory.getAddress(),
+        [await smartAccountV3Contract.getAddress(), await b3tr.getAddress()], // V3 initialization args
+        { version: 3 } // specify V3 initialization
+      )) as SimpleAccountFactory;
+
+      // Try to create the same account again
+      const tx2 = await simpleAccountFactoryV3.createAccountWithSalt(
+        await owner.getAddress(),
+        salt
+      );
+      const receipt2 = await tx2.wait();
+
+      // Verify both transactions returned the same address
+      expect(accountAddress).to.equal(
+        await simpleAccountFactoryV3.getAccountAddressWithSalt(
+          await owner.getAddress(),
+          salt
+        )
+      );
+
+      // Verify only one AccountCreated event was emitted (from the first creation)
+      const events1 = receipt1?.logs.filter(
+        (log) =>
+          log.topics[0] ===
+          simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
+      );
+      const events2 = receipt2?.logs.filter(
+        (log) =>
+          log.topics[0] ===
+          simpleAccountFactoryV3.interface.getEvent("AccountCreated").topicHash
+      );
+      expect(events1?.length).to.equal(1);
+      expect(events2?.length).to.equal(0);
+    });
+
+    it("returns existing account when calling createAccountWithSalt for already deployed account (with V3)", async () => {
+      const { simpleAccountFactory, otherAccounts } =
+        await getOrDeployContracts(true);
+      const owner = otherAccounts[0];
+      const salt = 12345n;
+
+      // First creation
+      const tx1 = await simpleAccountFactory.createAccountWithSalt(
+        await owner.getAddress(),
+        salt
+      );
+      const receipt1 = await tx1.wait();
+
+      // Get the account address
+      const accountAddress =
+        await simpleAccountFactory.getAccountAddressWithSalt(
+          await owner.getAddress(),
+          salt
+        );
+
+      // Try to create the same account again
+      const tx2 = await simpleAccountFactory.createAccountWithSalt(
+        await owner.getAddress(),
+        salt
+      );
+      const receipt2 = await tx2.wait();
+
+      // Verify both transactions returned the same address
+      expect(accountAddress).to.equal(
+        await simpleAccountFactory.getAccountAddressWithSalt(
+          await owner.getAddress(),
+          salt
+        )
+      );
+
+      // Verify only one AccountCreated event was emitted (from the first creation)
+      const events1 = receipt1?.logs.filter(
+        (log) =>
+          log.topics[0] ===
+          simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
+      );
+      const events2 = receipt2?.logs.filter(
+        (log) =>
+          log.topics[0] ===
+          simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
+      );
+      expect(events1?.length).to.equal(1);
+      expect(events2?.length).to.equal(0);
+    });
   });
 
   describe("SimpleAccount management", () => {
@@ -1245,6 +1464,26 @@ describe("SimpleAccountFactory", () => {
           );
 
         expect(addressWithV3Factory).to.equal(addressWithV2Factory);
+
+        // If we call createAccountWithSalt it should create account with V1 implementation
+        const tx2 = await simpleAccountFactoryV3.createAccountWithSalt(
+          await deployer.getAddress(),
+          salt
+        );
+        const receipt2 = await tx2.wait();
+
+        const events2 = receipt2?.logs.filter(
+          (log) =>
+            log.topics[0] ===
+            simpleAccountFactoryV3.interface.getEvent("AccountCreated")
+              .topicHash
+        );
+        expect(events2?.length).to.equal(1);
+
+        // Check that the first arg of the event is the address calculated with V1 implementation
+        expect((events2?.[0] as EventLog).args[0]).to.equal(
+          addressWithV2Factory
+        );
       });
 
       it("After upgrading to V3, if account is not deployed and does not have a positive B3TR balance, the address should change to latest implementation address (with salt)", async () => {
