@@ -16,6 +16,7 @@ import {
 } from "../typechain-types";
 import { ZeroAddress } from "ethers";
 import { EventLog } from "ethers";
+import { createSmartAccountThroughFactory } from "./helpers/common";
 
 describe("SimpleAccountFactory", () => {
   describe("Deployment", () => {
@@ -1523,6 +1524,119 @@ describe("SimpleAccountFactory", () => {
 
         expect(addressWithV3Factory).to.not.equal(addressWithV2Factory);
       });
+    });
+  });
+
+  describe("Check smart account upgradability", () => {
+    it("user can know when to upgrade to V3", async () => {
+      const { deployer, simpleAccountFactory } =
+        await getOrDeployContracts(true);
+
+      expect(await simpleAccountFactory.version()).to.equal(3n);
+
+      const { smartAccount, smartAccountAddress } =
+        await createSmartAccountThroughFactory(deployer);
+
+      expect(await smartAccount.version()).to.equal(3n);
+
+      // check if upgrade is needed (it shouldn't since it was created with V3 of factory)
+      expect(
+        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+          smartAccountAddress,
+          3
+        )
+      ).to.be.false;
+
+      // now let's downgrade the account of the user to v1
+      const Contract = await ethers.getContractFactory("SimpleAccountV1");
+      const implementation = await Contract.deploy();
+      await implementation.waitForDeployment();
+
+      await smartAccount.upgradeToAndCall(
+        await implementation.getAddress(),
+        "0x"
+      );
+
+      await expect(smartAccount.version()).to.be.reverted;
+
+      // check if upgrade is needed (it should since it was created with V1 of factory)
+      expect(
+        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+          smartAccountAddress,
+          3
+        )
+      ).to.be.true;
+    });
+
+    it("Checking available upgrades for a not deployed account should return false", async () => {
+      const { deployer, simpleAccountFactory } =
+        await getOrDeployContracts(true);
+
+      const accountAddress =
+        await simpleAccountFactory.getAccountAddressWithSalt(
+          await deployer.getAddress(),
+          ethers.toBigInt(ethers.randomBytes(32))
+        );
+
+      // check that code is not deployed at the address
+      const code = await ethers.provider.getCode(accountAddress);
+      expect(code).to.equal("0x");
+
+      // check that the account needs upgrade to v3
+      expect(
+        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+          accountAddress,
+          3
+        )
+      ).to.be.false;
+    });
+
+    it("should correctly identify when account needs upgrade to higher version", async () => {
+      const { deployer, simpleAccountFactory } =
+        await getOrDeployContracts(true);
+
+      // Create account with V3 first
+      const { smartAccount, smartAccountAddress } =
+        await createSmartAccountThroughFactory(deployer);
+      expect(await smartAccount.version()).to.equal(3n);
+
+      // Deploy V2 implementation
+      const ContractV2 = await ethers.getContractFactory("SimpleAccountV2");
+      const implementationV2 = await ContractV2.deploy();
+      await implementationV2.waitForDeployment();
+
+      // Downgrade account to V2
+      await smartAccount.upgradeToAndCall(
+        await implementationV2.getAddress(),
+        "0x"
+      );
+
+      // Verify account is now at V2
+      expect(await smartAccount.version()).to.equal(2n);
+
+      // Check if upgrade is needed to V3 (should return true since V2 < V3)
+      expect(
+        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+          smartAccountAddress,
+          3
+        )
+      ).to.be.true;
+
+      // Check if upgrade is needed to V2 (should return false since account is at V2)
+      expect(
+        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+          smartAccountAddress,
+          2
+        )
+      ).to.be.false;
+
+      // Check if upgrade is needed to V1 (should return false since V2 > V1)
+      expect(
+        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+          smartAccountAddress,
+          1
+        )
+      ).to.be.false;
     });
   });
 });
