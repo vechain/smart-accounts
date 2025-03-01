@@ -1156,5 +1156,134 @@ describe("SimpleAccountFactory", () => {
 
       expect(addressWithV3Factory).to.not.equal(addressWithV1Factory);
     });
+
+    describe("Smart Account addresses consistency with salt", () => {
+      it("Upgrading contract to V3 should not change the address of the account if already created with salt", async () => {
+        const [deployer, ...otherAccounts] = await ethers.getSigners();
+        const { b3tr } = await getOrDeployContracts(true);
+
+        // Deploy V2 factory instead of V1
+        const simpleAccountFactory = (await deployProxy(
+          "SimpleAccountFactoryV2",
+          [] // initialize with no args
+        )) as SimpleAccountFactoryV2;
+
+        // Rest of the test remains the same
+        const salt = BigInt(1);
+        const addressWithV2Factory =
+          await simpleAccountFactory.getAccountAddressWithSalt(
+            await deployer.getAddress(),
+            salt
+          );
+        await simpleAccountFactory.createAccountWithSalt(
+          await deployer.getAddress(),
+          salt
+        );
+
+        // Upgrade factory to V3
+        const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+        const smartAccountV3 = await SmartAccountV3.deploy();
+        await smartAccountV3.waitForDeployment();
+
+        const simpleAccountFactoryV3 = (await upgradeProxy(
+          "SimpleAccountFactoryV2", // Change from V1 to V2
+          "SimpleAccountFactory",
+          await simpleAccountFactory.getAddress(),
+          [await smartAccountV3.getAddress(), await b3tr.getAddress()],
+          { version: 3 }
+        )) as SimpleAccountFactory;
+        expect(await simpleAccountFactoryV3.version()).to.equal(3n);
+
+        const addressWithV3Factory =
+          await simpleAccountFactoryV3.getAccountAddressWithSalt(
+            await deployer.getAddress(),
+            salt
+          );
+
+        expect(addressWithV3Factory).to.equal(addressWithV2Factory);
+
+        const codeAfter = await ethers.provider.getCode(addressWithV3Factory);
+        expect(codeAfter).to.not.equal("0x");
+      });
+
+      it("Upgrading contract to V3 should not change the address if the account is not deployed but has a positive B3TR balance (with salt)", async () => {
+        const [deployer, ...otherAccounts] = await ethers.getSigners();
+        const { b3tr } = await getOrDeployContracts(true);
+
+        // Deploy V2 factory instead of V1
+        const simpleAccountFactory = (await deployProxy(
+          "SimpleAccountFactoryV2",
+          [] // initialize with no args
+        )) as SimpleAccountFactoryV2;
+
+        const salt = BigInt(2);
+        const addressWithV2Factory =
+          await simpleAccountFactory.getAccountAddressWithSalt(
+            await deployer.getAddress(),
+            salt
+          );
+
+        await b3tr.transfer(addressWithV2Factory, ethers.parseEther("1"));
+
+        const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+        const smartAccountV3 = await SmartAccountV3.deploy();
+        await smartAccountV3.waitForDeployment();
+
+        const simpleAccountFactoryV3 = (await upgradeProxy(
+          "SimpleAccountFactoryV2", // Change from V1 to V2
+          "SimpleAccountFactory",
+          await simpleAccountFactory.getAddress(),
+          [await smartAccountV3.getAddress(), await b3tr.getAddress()],
+          { version: 3 }
+        )) as SimpleAccountFactory;
+        expect(await simpleAccountFactoryV3.version()).to.equal(3n);
+
+        const addressWithV3Factory =
+          await simpleAccountFactoryV3.getAccountAddressWithSalt(
+            await deployer.getAddress(),
+            salt
+          );
+
+        expect(addressWithV3Factory).to.equal(addressWithV2Factory);
+      });
+
+      it("After upgrading to V3, if account is not deployed and does not have a positive B3TR balance, the address should change to latest implementation address (with salt)", async () => {
+        const [deployer, ...otherAccounts] = await ethers.getSigners();
+        const { b3tr } = await getOrDeployContracts(true);
+
+        // Deploy V2 factory instead of V1
+        const simpleAccountFactory = (await deployProxy(
+          "SimpleAccountFactoryV2",
+          [] // initialize with no args
+        )) as SimpleAccountFactoryV2;
+
+        const salt = BigInt(3);
+        const addressWithV2Factory =
+          await simpleAccountFactory.getAccountAddressWithSalt(
+            await deployer.getAddress(),
+            salt
+          );
+
+        const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+        const smartAccountV3 = await SmartAccountV3.deploy();
+        await smartAccountV3.waitForDeployment();
+
+        const simpleAccountFactoryV3 = (await upgradeProxy(
+          "SimpleAccountFactoryV2", // Change from V1 to V2
+          "SimpleAccountFactory",
+          await simpleAccountFactory.getAddress(),
+          [await smartAccountV3.getAddress(), await b3tr.getAddress()],
+          { version: 3 }
+        )) as SimpleAccountFactory;
+
+        const addressWithV3Factory =
+          await simpleAccountFactoryV3.getAccountAddressWithSalt(
+            await deployer.getAddress(),
+            salt
+          );
+
+        expect(addressWithV3Factory).to.not.equal(addressWithV2Factory);
+      });
+    });
   });
 });
