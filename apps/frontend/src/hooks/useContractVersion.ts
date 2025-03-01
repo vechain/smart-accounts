@@ -10,7 +10,7 @@ const SimpleAccountFactoryInterface =
 export const getVersion = async (
   thor: Connex.Thor,
   contractAddress: string
-): Promise<string> => {
+): Promise<number | string> => {
   const functionFragment =
     SimpleAccountFactoryInterface.getFunction("version").format("json");
 
@@ -19,7 +19,7 @@ export const getVersion = async (
     .method(JSON.parse(functionFragment))
     .call();
 
-  if (res.reverted) throw new Error("Reverted");
+  if (res.reverted) return "Unknown";
 
   return res.decoded[0];
 };

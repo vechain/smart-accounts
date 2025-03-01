@@ -13,7 +13,7 @@ export const Navbar = () => {
       <HStack justify={"space-between"} p={2} maxW={"1000px"} w={"full"}>
         <HStack spacing={2}>
           <Image src={logo} alt="logo" w={"50px"} rounded="full" />
-          <Heading size={"sm"}>VeChain Smart Accounts Factory</Heading>
+          <Heading size={"sm"}>VeChain Smart Accounts</Heading>
         </HStack>
 
         <HStack spacing={4}>

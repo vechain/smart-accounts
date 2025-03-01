@@ -14,13 +14,17 @@
     "contracts:compile": "dotenv -v VITE_APP_ENV=testnet -- turbo run compile --filter=@repo/contracts",
     "contracts:deploy:testnet": "dotenv -v VITE_APP_ENV=testnet -- turbo run deploy:testnet --filter=@repo/contracts",
     "contracts:deploy:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- turbo run deploy:mainnet --filter=@repo/contracts",
-    "contracts:upgrade:testnet": "dotenv -v VITE_APP_ENV=testnet -- turbo run upgrade:testnet --filter=contracts",
-    "contracts:upgrade:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- turbo run upgrade:mainnet --filter=contracts",
+    "contracts:upgrade": "dotenv -v VITE_APP_ENV=local -- yarn workspace @repo/contracts ts-node scripts/upgrade/select-and-upgrade.ts",
+    "contracts:upgrade:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts ts-node scripts/upgrade/select-and-upgrade.ts",
+    "contracts:upgrade:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts ts-node scripts/upgrade/select-and-upgrade.ts",
     "check-contracts-deployment:testnet": "npx hardhat run scripts/checkContractsDeployment.ts --network vechain_testnet",
     "check-contracts-deployment:mainnet": "npx hardhat run scripts/checkContractsDeployment.ts --network vechain_mainnet",
     "solo-up": "make solo-up",
     "solo-down": "make solo-down",
-    "solo-clean": "make solo-clean"
+    "solo-clean": "make solo-clean",
+    "contracts:test": "dotenv -v NEXT_PUBLIC_APP_ENV=local -- turbo run test:hardhat --filter=contracts",
+    "contracts:generate-docs": "dotenv -v NEXT_PUBLIC_APP_ENV=local -- turbo run generate-docs --filter=contracts",
+    "test:coverage:solidity": "dotenv -v NEXT_PUBLIC_APP_ENV=local -v IS_TEST_COVERAGE=true -e .env.example turbo run test:coverage:solidity"
   },
   "devDependencies": {
     "prettier": "^3.2.5",

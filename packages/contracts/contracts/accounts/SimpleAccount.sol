@@ -10,9 +10,8 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-import "../core/Helpers.sol";
 import "./callback/TokenCallbackHandler.sol";
-import "../core/UserOperationLib.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title Minimal smart account.
@@ -23,6 +22,11 @@ import "../core/UserOperationLib.sol";
  * ---------- Version 2 ----------
  * - Added version() method to allow for versioning.
  * - Added transferOwnership method to allow for ownership transfer of the smart account.
+ *
+ * ---------- Version 3 ----------
+ * - Added executeBatchWithAuthorization() method, so multiple clauses can be signed at once.
+ * - Using nonces in new executeBatchWithAuthorization() method to prevent replay attacks (executeWithAuthorization() remains without nonces for backwards compatibility).
+ * - version() returns an integer, instead of a string.
  */
 contract SimpleAccount is
     Initializable,
@@ -30,16 +34,29 @@ contract SimpleAccount is
     EIP712Upgradeable,
     UUPSUpgradeable
 {
-    using UserOperationLib for PackedUserOperation;
-
     address public owner;
 
+    // Nonces are used to prevent replay attacks.
+    // The nonce can be genarated in many ways by devs (using Date.now(), block.number, ethers.randomBytes(32), etc.)
+    // and is part of the data the user signs, which means that for each nonce there is a different signature.
+    // Every time the `executeBatchWithAuthorization()` is triggered the nonce is saved onchain,
+    // which means that the same nonce cannot be reused, meaning that neither the signature can be reused.
+    mapping(bytes32 => bool) public usedNonces;
+
     event SimpleAccountInitialized(address indexed owner);
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
 
     // ---------- Initializer ---------- //
 
     constructor() {
         _disableInitializers();
+    }
+
+    function version() public pure returns (uint256) {
+        return 3;
     }
 
     /**
@@ -73,6 +90,7 @@ contract SimpleAccount is
 
     /**
      * @dev Internal function to check if the caller is the owner
+     * @dev This can be used when we want to allow both direct calls from the owner, and calls from the account or smart contract (using signatures)
      */
     function _onlyOwner() internal view {
         //directly from EOA owner, or through the account itself (which gets redirected through execute())
@@ -82,9 +100,7 @@ contract SimpleAccount is
         );
     }
 
-    /**
-     * @dev Require the function call went through owner
-     */
+    // Require the function call went through owner
     function _requireFromOwner() internal view {
         require(msg.sender == owner, "account: not Owner or EntryPoint");
     }
@@ -118,76 +134,6 @@ contract SimpleAccount is
     }
 
     /**
-     * @dev execute a transaction (called directly from owner) authorized via signatures
-     * @param to destination address to call
-     * @param value the value to pass in this call
-     * @param data the calldata to pass in this call
-     * @param validAfter unix timestamp after which the signature will be accepted
-     * @param validBefore unix timestamp until the signature will be accepted
-     * @param signature the signed type4 signature
-     */
-    function executeWithAuthorization(
-        address to,
-        uint256 value,
-        bytes calldata data,
-        uint256 validAfter,
-        uint256 validBefore,
-        bytes calldata signature
-    ) external payable {
-        _validateAuthorization(
-            to,
-            value,
-            data,
-            validAfter,
-            validBefore,
-            signature
-        );
-        _call(to, value, data);
-    }
-
-    /**
-     * @dev execute multiple transactions (called directly from owner) authorized via signatures
-     * @dev to reduce gas consumption for trivial case (no value), use a zero-length array to mean zero value
-     * @param to an array of destination addresses
-     * @param value an array of values to pass to each call. can be zero-length for no-value calls
-     * @param data an array of calldata to pass to each call
-     * @param validAfter an array of unix timestamps after which the signature will be accepted
-     * @param validBefore an array of unix timestamps until the signature will be accepted
-     * @param signatures an array of signed type4 signatures
-     */
-    function executeBatchWithAuthorization(
-        address[] calldata to,
-        uint256[] calldata value,
-        bytes[] calldata data,
-        uint256[] calldata validAfter,
-        uint256[] calldata validBefore,
-        bytes[] calldata signatures
-    ) external payable {
-        // Check array lengths match
-        require(
-            to.length == value.length &&
-                value.length == data.length &&
-                data.length == validAfter.length &&
-                validAfter.length == validBefore.length &&
-                validBefore.length == signatures.length,
-            "Array lengths mismatch"
-        );
-
-        // Execute each authorized transaction
-        for (uint256 i = 0; i < to.length; i++) {
-            _validateAuthorization(
-                to[i],
-                value[i],
-                data[i],
-                validAfter[i],
-                validBefore[i],
-                signatures[i]
-            );
-            _call(to[i], value[i], data[i]);
-        }
-    }
-
-    /**
      * @dev execute a sequence of transactions
      * @dev to reduce gas consumption for trivial case (no value), use a zero-length array to mean zero value
      * @param dest an array of destination addresses
@@ -217,12 +163,157 @@ contract SimpleAccount is
     }
 
     /**
+     * @dev execute a transaction (called directly from owner) authorized via signatures
+     * @notice There is an attack vector here, by replaying the same signature on the same account.
+     * @param to destination address to call
+     * @param value the value to pass in this call
+     * @param data the calldata to pass in this call
+     * @param validAfter unix timestamp after which the signature will be accepted
+     * @param validBefore unix timestamp until the signature will be accepted
+     * @param signature the signed type4 signature
+     */
+    function executeWithAuthorization(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes calldata signature
+    ) external payable {
+        _validateAuthorization(
+            to,
+            value,
+            data,
+            validAfter,
+            validBefore,
+            signature
+        );
+        _call(to, value, data);
+    }
+
+    /**
+     * @dev execute multiple transactions (called directly from owner) authorized via signatures
+     * @param to an array of destination addresses
+     * @param value an array of values to pass to each call
+     * @param data an array of calldata to pass to each call
+     * @param validAfter an unix timestamp after which the signature will be accepted
+     * @param validBefore an unix timestamp until the signature will be accepted
+     * @param nonce the nonce to use for the batch
+     * @param signature the signed type4 signature for the entire batch
+     */
+    function executeBatchWithAuthorization(
+        address[] calldata to,
+        uint256[] calldata value,
+        bytes[] calldata data,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        bytes calldata signature
+    ) external payable {
+        // Check array lengths match
+        require(
+            to.length == value.length && value.length == data.length,
+            "Array lengths mismatch"
+        );
+
+        // Check that the signature is not used yet
+        require(
+            !usedNonces[nonce],
+            "Nonce already used, please sign a new transaction"
+        );
+
+        // Check time validity for all transactions
+        require(block.timestamp > validAfter, "Authorization not yet valid");
+        require(block.timestamp < validBefore, "Authorization expired");
+
+        // Validate batch authorization
+        _validateBatchAuthorization(
+            to,
+            value,
+            data,
+            validAfter,
+            validBefore,
+            nonce,
+            signature
+        );
+
+        usedNonces[nonce] = true;
+
+        // Execute each transaction
+        for (uint256 i = 0; i < to.length; i++) {
+            _call(to[i], value[i], data[i]);
+        }
+    }
+
+    /**
      * @dev Transfer ownership of the account
      * @param newOwner the new owner of the account
      */
     function transferOwnership(address newOwner) public onlyOwner {
-        _requireFromOwner();
+        require(
+            newOwner != address(0),
+            "Cannot transfer ownership to the zero address"
+        );
+
+        emit OwnershipTransferred(owner, newOwner);
+
         owner = newOwner;
+    }
+
+    // ---------- Signature Validation ---------- //
+
+    /**
+     * @dev Validate a batch authorization
+     * @notice The array encoding follows EIP-712 standard for arrays:
+     * - For dynamic types (like bytes[]), each element is hashed individually first
+     * - Arrays are encoded by first encoding their elements, then hashing the concatenation
+     * This matches how ethers.js implements array encoding in signTypedData
+     * See: https://eips.ethereum.org/EIPS/eip-712#definition-of-encodedata
+     */
+    function _validateBatchAuthorization(
+        address[] calldata to,
+        uint256[] calldata value,
+        bytes[] calldata data,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        bytes calldata signature
+    ) internal view {
+        bytes32 typeHash = keccak256(
+            "ExecuteBatchWithAuthorization(address[] to,uint256[] value,bytes[] data,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
+        );
+
+        // Hash arrays according to EIP-712 array encoding rules
+        bytes32[] memory dataHashes = new bytes32[](data.length);
+        for (uint256 i = 0; i < data.length; i++) {
+            dataHashes[i] = keccak256(data[i]);
+        }
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                typeHash,
+                keccak256(abi.encodePacked(to)),
+                keccak256(abi.encodePacked(value)),
+                keccak256(abi.encodePacked(dataHashes)),
+                validAfter,
+                validBefore,
+                nonce
+            )
+        );
+        bytes32 digest = _hashTypedDataV4(structHash);
+
+        address recoveredAddress = ECDSA.recover(digest, signature);
+        require(
+            recoveredAddress == owner,
+            string(
+                abi.encodePacked(
+                    "Invalid signer. Expected: ",
+                    Strings.toHexString(owner),
+                    " Got: ",
+                    Strings.toHexString(recoveredAddress)
+                )
+            )
+        );
     }
 
     /**
@@ -260,22 +351,6 @@ contract SimpleAccount is
     // ---------- Internal ---------- //
 
     /**
-     * @dev Implement template method of BaseAccount
-     * @param userOp the user operation to validate
-     * @param userOpHash the hash of the user operation
-     * @return validationData the validation data
-     */
-    function _validateSignature(
-        PackedUserOperation calldata userOp,
-        bytes32 userOpHash
-    ) internal virtual returns (uint256 validationData) {
-        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(userOpHash);
-        if (owner != ECDSA.recover(hash, userOp.signature))
-            return SIG_VALIDATION_FAILED;
-        return SIG_VALIDATION_SUCCESS;
-    }
-
-    /**
      * @dev Internal function to call a target
      * @param target the target address to call
      * @param value the value to pass in this call
@@ -291,14 +366,6 @@ contract SimpleAccount is
     }
 
     // ---------- Getters ---------- //
-
-    /**
-     * @dev Get the version of the account
-     * @return the version of the account
-     */
-    function version() public pure returns (string memory) {
-        return "3";
-    }
 
     // ---------- Fallback ---------- //
 

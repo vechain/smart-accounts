@@ -41,6 +41,17 @@
       "cache": false,
       "dotEnv": [".env"]
     },
+    "upgrade:contract": {
+      "dependsOn": ["@repo/config#check-or-generate-local-config"],
+      "outputs": [],
+      "cache": false
+    },
+    "upgrade:contract:testnet": {
+      "dependsOn": ["upgrade:contract"]
+    },
+    "upgrade:contract:mainnet": {
+      "dependsOn": ["upgrade:contract"]
+    },
     "setup-contracts": {
       "cache": false,
       "persistent": true,
@@ -122,6 +133,9 @@
     "test:hardhat": {
       "cache": false,
       "dependsOn": ["@repo/config#check-or-generate-local-config"]
+    },
+    "generate-docs": {
+      "cache": false
     }
   }
 }

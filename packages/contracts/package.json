@@ -8,11 +8,11 @@
     "test:thor-solo": "npx hardhat test",
     "test:hardhat": "hardhat test --network hardhat",
     "test:coverage:solidity": "hardhat coverage --testfiles ./test/**/*test.ts",
+    "coverage:report": "nyc report --reporter=lcov --reporter=text --reporter=html --temp-dir=./coverage",
     "compile": "npx hardhat compile",
     "deploy:testnet": "npx hardhat run scripts/deploy --network vechain_testnet",
     "deploy:mainnet": "npx hardhat run scripts/deploy --network vechain_mainnet",
-    "upgrade:testnet": "npx hardhat run scripts/upgrade --network vechain_testnet",
-    "upgrade:mainnet": "npx hardhat run scripts/upgrade --network vechain_mainnet",
+    "upgrade:contract": "npx hardhat run scripts/upgrade/upgrades/\"$CONTRACT_TO_UPGRADE\"/\"$CONTRACT_TO_UPGRADE\"-\"$CONTRACT_VERSION\".ts",
     "check-contracts-deployment:testnet": "npx hardhat run scripts/checkContractsDeployment.ts --network vechain_testnet",
     "check-contracts-deployment:mainnet": "npx hardhat run scripts/checkContractsDeployment.ts --network vechain_mainnet",
     "generate-galaxy-member-metadata": "npx hardhat run scripts/metadata/GalaxyMember/generate.ts",
@@ -59,11 +59,13 @@
     "hardhat-contract-sizer": "^2.10.0",
     "hardhat-gas-reporter": "^1.0.8",
     "hardhat-ignore-warnings": "^0.2.11",
+    "inquirer": "^12.4.2",
     "solidity-coverage": "^0.8.11",
     "solidity-docgen": "^0.6.0-beta.36",
     "ts-node": ">=8.0.0",
     "typechain": "^8.1.0",
-    "typescript": ">=4.5.0"
+    "typescript": ">=4.5.0",
+    "nyc": "^17.1.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^3.0.0",
