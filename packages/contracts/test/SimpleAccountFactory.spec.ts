@@ -431,6 +431,40 @@ describe("SimpleAccountFactory", () => {
       ).to.be.reverted;
     });
 
+    it("should call .initialize() directly for coverage", async () => {
+      const [deployer] = await ethers.getSigners();
+
+      // Deploy the logic/implementation contract
+      const Factory = await ethers.getContractFactory("SimpleAccountFactory");
+      const factoryImpl = await Factory.deploy();
+      await factoryImpl.waitForDeployment();
+
+      const Proxy = await ethers.getContractFactory("AAProxy");
+      const proxy = await Proxy.deploy(await factoryImpl.getAddress(), "0x");
+      await proxy.waitForDeployment();
+
+      const proxyContract = await ethers.getContractAt(
+        "SimpleAccountFactory",
+        await proxy.getAddress()
+      );
+
+      // Call initialize on the implementation directly
+      const tx = await proxyContract.initialize();
+      await tx.wait();
+
+      // Verify that DEFAULT_ADMIN_ROLE is granted to deployer
+      const DEFAULT_ADMIN_ROLE = await proxyContract.DEFAULT_ADMIN_ROLE();
+      const hasRole = await proxyContract.hasRole(
+        DEFAULT_ADMIN_ROLE,
+        await deployer.getAddress()
+      );
+      expect(hasRole).to.be.true;
+
+      // Verify that accountImplementationV1 was set (a SimpleAccount was deployed)
+      const accountV1Address = await proxyContract.accountImplementationV1();
+      expect(accountV1Address).to.properAddress;
+    });
+
     /**
      * Having a V3 of SimpleAccount means that the implementation address inside the factory changes, which causes the
      * address calculation through the "Create2" function to resolve to a different account.
