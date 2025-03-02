@@ -353,7 +353,7 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     }
 
     /**
-     * @dev Check if an account is legacy
+     * @dev Check if an owner has a legacy account
      * @param owner The address of the owner
      * @return True if the account is legacy, false otherwise
      */
