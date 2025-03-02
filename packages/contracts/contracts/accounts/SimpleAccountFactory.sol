@@ -354,6 +354,28 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
 
     /**
      * @dev Check if an account is legacy
+     * @param owner The address of the owner
+     * @return True if the account is legacy, false otherwise
+     */
+    function hasLegacyAccount(address owner) public view returns (bool) {
+        uint256 salt = uint256(uint160(owner));
+        address accountAddressGeneratedWithV1 = Create2.computeAddress(
+            bytes32(salt),
+            keccak256(
+                abi.encodePacked(
+                    type(ERC1967Proxy).creationCode,
+                    abi.encode(
+                        address(accountImplementationV1),
+                        abi.encodeCall(SimpleAccount.initialize, (owner))
+                    )
+                )
+            )
+        );
+        return _mustUseV1Implementation(accountAddressGeneratedWithV1);
+    }
+
+    /**
+     * @dev Check if an account is legacy
      * - If the account is deployed we know it is legacy, so V1 implementation address is returned.
      * - If the account is not deployed, we check if it has any balance of B3TR or VET tokens, if it does, we know it is legacy (so V1 implementation address is returned).
      * - Otherwise, we know it is not legacy, and we can use the V3 implementation address to calculate the counterfactual address.
