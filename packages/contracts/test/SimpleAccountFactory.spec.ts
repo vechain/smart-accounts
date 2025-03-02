@@ -1773,4 +1773,148 @@ describe("SimpleAccountFactory", () => {
       expect(await v3Account.version()).to.equal(3n);
     });
   });
+
+  describe("getAccountVersion", () => {
+    it("should correctly identify version of a deployed V3 account", async () => {
+      const { deployer, simpleAccountFactory } =
+        await getOrDeployContracts(true);
+
+      // Create a V3 account
+      const { smartAccount, smartAccountAddress } =
+        await createSmartAccountThroughFactory(deployer);
+
+      // Check version using getAccountVersion
+      const [version, isDeployed] =
+        await simpleAccountFactory.getAccountVersion(
+          smartAccountAddress,
+          await deployer.getAddress()
+        );
+
+      expect(version).to.equal(3n);
+      expect(isDeployed).to.be.true;
+    });
+
+    it("should correctly identify version of a deployed V1 account", async () => {
+      const { deployer, simpleAccountFactory, b3tr } =
+        await getOrDeployContracts(true);
+
+      // Create a V3 account first
+      const { smartAccount, smartAccountAddress } =
+        await createSmartAccountThroughFactory(deployer);
+
+      // Downgrade to V1
+      const ContractV1 = await ethers.getContractFactory("SimpleAccountV1");
+      const implementationV1 = await ContractV1.deploy();
+      await implementationV1.waitForDeployment();
+
+      await smartAccount.upgradeToAndCall(
+        await implementationV1.getAddress(),
+        "0x"
+      );
+
+      // Check version using getAccountVersion
+      const [version, isDeployed] =
+        await simpleAccountFactory.getAccountVersion(
+          smartAccountAddress,
+          await deployer.getAddress()
+        );
+
+      expect(version).to.equal(1n);
+      expect(isDeployed).to.be.true;
+    });
+
+    it("should correctly identify version of a non-deployed legacy account", async () => {
+      const { otherAccounts, simpleAccountFactory, b3tr } =
+        await getOrDeployContracts(true);
+
+      // Deploy V1 factory
+      const simpleAccountFactoryV1 = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV1;
+
+      // Generate address for user with V1 factory
+      const legacyUser = otherAccounts[0];
+      const legacyAddress = await simpleAccountFactoryV1.getAccountAddress(
+        await legacyUser.getAddress()
+      );
+
+      // Send B3TR tokens to make it a legacy account without deploying
+      await b3tr.transfer(legacyAddress, ethers.parseEther("1"));
+
+      // Upgrade factory to V3
+      const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3 = await SmartAccountV3.deploy();
+      await smartAccountV3.waitForDeployment();
+
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactory",
+        await simpleAccountFactoryV1.getAddress(),
+        [await smartAccountV3.getAddress(), await b3tr.getAddress()],
+        { version: 3 }
+      )) as SimpleAccountFactory;
+
+      // Check version using getAccountVersion
+      const [version, isDeployed] =
+        await simpleAccountFactoryV3.getAccountVersion(
+          legacyAddress,
+          await legacyUser.getAddress()
+        );
+
+      expect(version).to.equal(1n);
+      expect(isDeployed).to.be.false;
+    });
+
+    it("should correctly identify version of a non-deployed new account", async () => {
+      const { otherAccounts, simpleAccountFactory } =
+        await getOrDeployContracts(true);
+
+      // Get address for a new account that hasn't been deployed
+      const newUser = otherAccounts[0];
+      const newAddress = await simpleAccountFactory.getAccountAddress(
+        await newUser.getAddress()
+      );
+
+      // Check that it's not deployed
+      const code = await ethers.provider.getCode(newAddress);
+      expect(code).to.equal("0x");
+
+      // Check version using getAccountVersion
+      const [version, isDeployed] =
+        await simpleAccountFactory.getAccountVersion(
+          newAddress,
+          await newUser.getAddress()
+        );
+
+      // Should be the current implementation version (V3)
+      expect(version).to.equal(
+        await simpleAccountFactory.currentAccountImplementationVersion()
+      );
+      expect(isDeployed).to.be.false;
+    });
+
+    it("should revert if account address doesn't match calculated address", async () => {
+      const { deployer, otherAccounts, simpleAccountFactory } =
+        await getOrDeployContracts(true);
+
+      // Get address for owner1
+      const owner1 = deployer;
+      const owner1Address = await simpleAccountFactory.getAccountAddress(
+        await owner1.getAddress()
+      );
+
+      // Try to check version with mismatched owner
+      const owner2 = otherAccounts[0];
+
+      await expect(
+        simpleAccountFactory.getAccountVersion(
+          owner1Address,
+          await owner2.getAddress()
+        )
+      ).to.be.revertedWith(
+        "Account address does not match calculated address of owner"
+      );
+    });
+  });
 });

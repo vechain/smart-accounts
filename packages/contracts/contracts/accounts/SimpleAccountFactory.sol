@@ -395,6 +395,54 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     }
 
     /**
+     * @dev A helper function that calculates the version of an account (even if it is not deployed yet)
+     * @notice Since it is needed to mantain backwards compatibility with V1 accounts, this should
+     * be used to know what version an account is when it is not deployed yet.
+     * @notice This function is intended for accounts generated without custom salt.
+     *
+     * @param account The address of the account
+     * @param owner The owner of the account
+     * @return accountVersion The version of the account
+     * @return isDeployed True if the account is deployed, false otherwise
+     */
+    function getAccountVersion(
+        address account,
+        address owner
+    ) public view returns (uint256 accountVersion, bool isDeployed) {
+        address calculatedAddress = getAccountAddress(owner);
+        require(
+            calculatedAddress == account,
+            "Account address does not match calculated address of owner"
+        );
+
+        // check if the account is deployed
+        isDeployed = account.code.length > 0;
+
+        // if it is not deployed, check if it is legacy
+        if (!isDeployed) {
+            bool isLegacy = hasLegacyAccount(owner);
+
+            if (isLegacy) {
+                accountVersion = 1;
+            } else {
+                accountVersion = currentAccountImplementationVersion();
+            }
+            return (accountVersion, isDeployed);
+        }
+
+        // if it is deployed, let's call the version() method of the account
+        try SimpleAccount(payable(account)).version() returns (
+            uint256 _accountVersion
+        ) {
+            accountVersion = _accountVersion;
+        } catch {
+            // if it reverts, it means it is a V1 account, because V1 accounts do not have the version() method
+            accountVersion = 1;
+        }
+        return (accountVersion, isDeployed);
+    }
+
+    /**
      * @dev Get the current version of the account implementation
      * @return The current version of the account implementation
      */
