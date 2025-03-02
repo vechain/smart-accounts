@@ -28,10 +28,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * - Renamed accountImplementation to accountImplementationV1 to increase clarity.
  * - Added accountImplementationV3 to store the v3 of the smart account implementation contract.
  * - Added b3tr token address, used to check if an account is legacy or not.
- * - Added isLegacyAccount() method to check if an account is legacy or not.
  * - version() returns an integer, instead of a string.
  * - Fixed: createAccountWithSalt() method was using the getAccountAddress() method instead of getAccountAddressWithSalt()
  * - Fixed: emit AccountCreated after the account is created, so the address is not 0
+ * - Added hasLegacyAccount() method to check if an owner has a legacy account
  *
  * WARNING
  * Having a V3 of SimpleAccount means that the implementation address inside the factory changes, which causes the
