@@ -7,7 +7,6 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "./SimpleAccount.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "hardhat/console.sol";
 
 /**
  * @title SimpleAccountFactory
@@ -29,10 +28,10 @@ import "hardhat/console.sol";
  * - Renamed accountImplementation to accountImplementationV1 to increase clarity.
  * - Added accountImplementationV3 to store the v3 of the smart account implementation contract.
  * - Added b3tr token address, used to check if an account is legacy or not.
- * - Added isLegacyAccount() method to check if an account is legacy or not.
  * - version() returns an integer, instead of a string.
  * - Fixed: createAccountWithSalt() method was using the getAccountAddress() method instead of getAccountAddressWithSalt()
  * - Fixed: emit AccountCreated after the account is created, so the address is not 0
+ * - Added hasLegacyAccount() method to check if an owner has a legacy account
  *
  * WARNING
  * Having a V3 of SimpleAccount means that the implementation address inside the factory changes, which causes the
@@ -350,6 +349,28 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
                     )
                 )
             );
+    }
+
+    /**
+     * @dev Check if an owner has a legacy account
+     * @param owner The address of the owner
+     * @return True if the account is legacy, false otherwise
+     */
+    function hasLegacyAccount(address owner) public view returns (bool) {
+        uint256 salt = uint256(uint160(owner));
+        address accountAddressGeneratedWithV1 = Create2.computeAddress(
+            bytes32(salt),
+            keccak256(
+                abi.encodePacked(
+                    type(ERC1967Proxy).creationCode,
+                    abi.encode(
+                        address(accountImplementationV1),
+                        abi.encodeCall(SimpleAccount.initialize, (owner))
+                    )
+                )
+            )
+        );
+        return _mustUseV1Implementation(accountAddressGeneratedWithV1);
     }
 
     /**

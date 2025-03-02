@@ -88,8 +88,6 @@ The system has evolved through multiple versions to improve functionality and se
 
 The factory maintains compatibility with all account versions, ensuring a smooth experience across different dApps and versions.
 
-You can fork the contracts and deploy them on your own, **but we recommend using our deployed contracts for a better cross-app compatibility**.
-
 ## Project Structure
 
 ### Frontend (apps/frontend) 🌐

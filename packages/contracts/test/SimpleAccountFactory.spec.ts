@@ -1672,5 +1672,105 @@ describe("SimpleAccountFactory", () => {
         )
       ).to.be.false;
     });
+
+    it("hasLegacyAccount should correctly identify legacy accounts", async () => {
+      const { b3tr, otherAccounts } = await getOrDeployContracts(true);
+
+      // Deploy V1 factory
+      const simpleAccountFactoryV1 = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV1;
+
+      // Setup our test users with different scenarios
+      const [deployedV1User, hasB3trUser, hasEthUser, notUsedUser] =
+        otherAccounts;
+
+      // Generate addresses for all users with V1 factory
+      const deployedV1Address = await simpleAccountFactoryV1.getAccountAddress(
+        await deployedV1User.getAddress()
+      );
+      const hasB3trAddress = await simpleAccountFactoryV1.getAccountAddress(
+        await hasB3trUser.getAddress()
+      );
+      const hasEthAddress = await simpleAccountFactoryV1.getAccountAddress(
+        await hasEthUser.getAddress()
+      );
+      const notUsedAddress = await simpleAccountFactoryV1.getAccountAddress(
+        await notUsedUser.getAddress()
+      );
+
+      // 1. Create an account with V1 factory (deployed)
+      await simpleAccountFactoryV1.createAccount(
+        await deployedV1User.getAddress()
+      );
+
+      // 2. Send B3TR tokens to an address (not deployed)
+      await b3tr.transfer(hasB3trAddress, ethers.parseEther("1"));
+
+      // 3. Send ETH to an address (not deployed)
+      await hasEthUser.sendTransaction({
+        to: hasEthAddress,
+        value: ethers.parseEther("1"),
+      });
+
+      // 4. Let notUsedAddress remain untouched (not deployed, no balance)
+
+      // Upgrade factory to V3
+      const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3 = await SmartAccountV3.deploy();
+      await smartAccountV3.waitForDeployment();
+
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactory",
+        await simpleAccountFactoryV1.getAddress(),
+        [await smartAccountV3.getAddress(), await b3tr.getAddress()], // V3 initialization args
+        { version: 3 } // specify V3 initialization
+      )) as SimpleAccountFactory;
+
+      // Now test hasLegacyAccount for each scenario
+      expect(
+        await simpleAccountFactoryV3.hasLegacyAccount(
+          await deployedV1User.getAddress()
+        )
+      ).to.be.true;
+      expect(
+        await simpleAccountFactoryV3.hasLegacyAccount(
+          await hasB3trUser.getAddress()
+        )
+      ).to.be.true;
+      expect(
+        await simpleAccountFactoryV3.hasLegacyAccount(
+          await hasEthUser.getAddress()
+        )
+      ).to.be.true;
+      expect(
+        await simpleAccountFactoryV3.hasLegacyAccount(
+          await notUsedUser.getAddress()
+        )
+      ).to.be.false;
+
+      // 5. Create a V3 account (should be non-legacy)
+      const v3User = otherAccounts[4];
+      expect(
+        await simpleAccountFactoryV3.hasLegacyAccount(await v3User.getAddress())
+      ).to.be.false;
+
+      // After creating the account, it should be considered legacy (because it's deployed)
+      await simpleAccountFactoryV3.createAccount(await v3User.getAddress());
+      expect(
+        await simpleAccountFactoryV3.hasLegacyAccount(await v3User.getAddress())
+      ).to.be.false;
+
+      // Verify the account is actually V3
+      const v3Account = await ethers.getContractAt(
+        "SimpleAccount",
+        await simpleAccountFactoryV3.getAccountAddress(
+          await v3User.getAddress()
+        )
+      );
+      expect(await v3Account.version()).to.equal(3n);
+    });
   });
 });
