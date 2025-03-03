@@ -1772,6 +1772,469 @@ describe("SimpleAccountFactory", () => {
       );
       expect(await v3Account.version()).to.equal(3n);
     });
+
+    it("should use current implementation version when targetVersion is 0 in accountNeedsUpgradeToVersion", async () => {
+      // Get signers
+      const [deployer, ...otherAccounts] = await ethers.getSigners();
+
+      // Deploy B3TR token
+      const B3TR = await ethers.getContractFactory("B3TR_Mock");
+      const b3tr = await B3TR.deploy();
+      await b3tr.waitForDeployment();
+
+      // Deploy V1 factory
+      const simpleAccountFactoryV1 = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV1;
+
+      // Create account with V1 factory
+      await simpleAccountFactoryV1.createAccount(await deployer.getAddress());
+      const accountAddress = await simpleAccountFactoryV1.getAccountAddress(
+        await deployer.getAddress()
+      );
+
+      // Deploy V3 implementation for SimpleAccount
+      const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3Implementation = await SmartAccountV3.deploy();
+      await smartAccountV3Implementation.waitForDeployment();
+
+      // Upgrade factory to V3
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactory",
+        await simpleAccountFactoryV1.getAddress(),
+        [
+          await smartAccountV3Implementation.getAddress(),
+          await b3tr.getAddress(),
+        ], // V3 initialization args
+        { version: 3 } // specify V3 initialization
+      )) as SimpleAccountFactory;
+
+      // Check if upgrade is needed with targetVersion = 0 (should use current version = 3)
+      const needsUpgrade =
+        await simpleAccountFactoryV3.accountNeedsUpgradeToVersion(
+          accountAddress,
+          0
+        );
+
+      // Should be true since V1 < V3
+      expect(needsUpgrade).to.be.true;
+
+      // Verify current implementation version is 3
+      expect(
+        await simpleAccountFactoryV3.currentAccountImplementationVersion()
+      ).to.equal(3n);
+    });
+
+    it("should revert when targetVersion is greater than current implementation version in accountNeedsUpgradeToVersion", async () => {
+      // Get signers
+      const [deployer, ...otherAccounts] = await ethers.getSigners();
+
+      // Deploy B3TR token
+      const B3TR = await ethers.getContractFactory("B3TR_Mock");
+      const b3tr = await B3TR.deploy();
+      await b3tr.waitForDeployment();
+
+      // Deploy V1 factory
+      const simpleAccountFactoryV1 = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV1;
+
+      // Create account with V1 factory
+      await simpleAccountFactoryV1.createAccount(await deployer.getAddress());
+      const accountAddress = await simpleAccountFactoryV1.getAccountAddress(
+        await deployer.getAddress()
+      );
+
+      // Deploy V3 implementation for SimpleAccount
+      const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3Implementation = await SmartAccountV3.deploy();
+      await smartAccountV3Implementation.waitForDeployment();
+
+      // Upgrade factory to V3
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactory",
+        await simpleAccountFactoryV1.getAddress(),
+        [
+          await smartAccountV3Implementation.getAddress(),
+          await b3tr.getAddress(),
+        ], // V3 initialization args
+        { version: 3 } // specify V3 initialization
+      )) as SimpleAccountFactory;
+
+      // Try to check with targetVersion = 4 (greater than current version = 3)
+      await expect(
+        simpleAccountFactoryV3.accountNeedsUpgradeToVersion(accountAddress, 4)
+      ).to.be.revertedWith(
+        "Target version must be less than or equal to the current version"
+      );
+    });
+  });
+
+  describe("Account needs upgrade", () => {
+    it("should correctly identify upgrade requirements for different account scenarios", async () => {
+      // Get signers
+      const [deployer, ...otherAccounts] = await ethers.getSigners();
+      const user1 = otherAccounts[0];
+      const user2 = otherAccounts[1];
+
+      // Deploy B3TR token
+      const B3TR = await ethers.getContractFactory("B3TR_Mock");
+      const b3tr = await B3TR.deploy();
+      await b3tr.waitForDeployment();
+
+      // Deploy V1 factory
+      const simpleAccountFactoryV1 = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV1;
+
+      // Setup different account scenarios
+      // 1. Account created with V1 factory
+      await simpleAccountFactoryV1.createAccount(await deployer.getAddress());
+      const deployedV1Address = await simpleAccountFactoryV1.getAccountAddress(
+        await deployer.getAddress()
+      );
+
+      // 2. Account with B3TR tokens but not deployed
+      const b3trOnlyAddress = await simpleAccountFactoryV1.getAccountAddress(
+        await user1.getAddress()
+      );
+      await b3tr.transfer(b3trOnlyAddress, ethers.parseEther("1"));
+
+      // 3. Account with ETH/VET but not deployed
+      const ethOnlyAddress = await simpleAccountFactoryV1.getAccountAddress(
+        await user2.getAddress()
+      );
+      await user2.sendTransaction({
+        to: ethOnlyAddress,
+        value: ethers.parseEther("1"),
+      });
+
+      // Deploy V3 implementation for SimpleAccount
+      const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3Implementation = await SmartAccountV3.deploy();
+      await smartAccountV3Implementation.waitForDeployment();
+
+      // Upgrade factory to V3
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactory",
+        await simpleAccountFactoryV1.getAddress(),
+        [
+          await smartAccountV3Implementation.getAddress(),
+          await b3tr.getAddress(),
+        ], // V3 initialization args
+        { version: 3 } // specify V3 initialization
+      )) as SimpleAccountFactory;
+
+      // Get the deployed V1 account contract
+      const deployedV1Account = await ethers.getContractAt(
+        "SimpleAccount",
+        deployedV1Address
+      );
+
+      // Verify it's a V1 account
+      await expect(deployedV1Account.version()).to.be.reverted;
+
+      // Check if upgrade is needed for all three scenarios (should be true)
+      expect(
+        await simpleAccountFactoryV3.upgradeRequired(
+          deployedV1Address,
+          await deployer.getAddress(),
+          3
+        )
+      ).to.be.true;
+
+      expect(
+        await simpleAccountFactoryV3.upgradeRequired(
+          b3trOnlyAddress,
+          await user1.getAddress(),
+          3
+        )
+      ).to.be.true;
+
+      expect(
+        await simpleAccountFactoryV3.upgradeRequired(
+          ethOnlyAddress,
+          await user2.getAddress(),
+          3
+        )
+      ).to.be.true;
+
+      // Now create a V3 account
+      await simpleAccountFactoryV3.createAccount(
+        await otherAccounts[3].getAddress()
+      );
+      const v3AccountAddress = await simpleAccountFactoryV3.getAccountAddress(
+        await otherAccounts[3].getAddress()
+      );
+
+      // Get the V3 account contract
+      const v3Account = await ethers.getContractAt(
+        "SimpleAccount",
+        v3AccountAddress
+      );
+
+      // Verify it's a V3 account
+      expect(await v3Account.version()).to.equal(3n);
+
+      // Check if upgrade is needed (should be false)
+      expect(
+        await simpleAccountFactoryV3.upgradeRequired(
+          v3AccountAddress,
+          await otherAccounts[3].getAddress(),
+          3
+        )
+      ).to.be.false;
+
+      // Check non-deployed account with V3 factory (should be false)
+      const nonDeployedV3Address =
+        await simpleAccountFactoryV3.getAccountAddress(
+          await otherAccounts[4].getAddress()
+        );
+
+      // Verify account is not deployed
+      const code = await ethers.provider.getCode(nonDeployedV3Address);
+      expect(code).to.equal("0x");
+
+      expect(
+        await simpleAccountFactoryV3.upgradeRequired(
+          nonDeployedV3Address,
+          await otherAccounts[4].getAddress(),
+          3
+        )
+      ).to.be.false;
+    });
+
+    it("should handle account upgrades and version comparisons correctly", async () => {
+      // Get signers
+      const [deployer, ...otherAccounts] = await ethers.getSigners();
+
+      // Deploy B3TR token
+      const B3TR = await ethers.getContractFactory("B3TR_Mock");
+      const b3tr = await B3TR.deploy();
+      await b3tr.waitForDeployment();
+
+      // Deploy V1 factory
+      const simpleAccountFactoryV1 = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV1;
+
+      // Create account with V1 factory
+      await simpleAccountFactoryV1.createAccount(await deployer.getAddress());
+      const accountAddress = await simpleAccountFactoryV1.getAccountAddress(
+        await deployer.getAddress()
+      );
+
+      // Deploy V3 implementation for SimpleAccount
+      const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3Implementation = await SmartAccountV3.deploy();
+      await smartAccountV3Implementation.waitForDeployment();
+
+      // Upgrade factory to V3
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactory",
+        await simpleAccountFactoryV1.getAddress(),
+        [
+          await smartAccountV3Implementation.getAddress(),
+          await b3tr.getAddress(),
+        ], // V3 initialization args
+        { version: 3 } // specify V3 initialization
+      )) as SimpleAccountFactory;
+
+      // Get the account contract
+      const account = await ethers.getContractAt(
+        "SimpleAccount",
+        accountAddress
+      );
+
+      // Verify it's a V1 account
+      await expect(account.version()).to.be.reverted;
+
+      // Check if upgrade is needed to V3 (should be true)
+      const needsUpgradeBefore = await simpleAccountFactoryV3.upgradeRequired(
+        accountAddress,
+        await deployer.getAddress(),
+        3
+      );
+      expect(needsUpgradeBefore).to.be.true;
+
+      // Now upgrade the account to V3
+      const implementationV3Address =
+        await simpleAccountFactoryV3.accountImplementationV3();
+      await account.upgradeToAndCall(implementationV3Address, "0x");
+
+      // Verify it's now a V3 account
+      expect(await account.version()).to.equal(3n);
+
+      // Check if upgrade is still needed (should be false now)
+      const needsUpgradeAfter = await simpleAccountFactoryV3.upgradeRequired(
+        accountAddress,
+        await deployer.getAddress(),
+        3
+      );
+      expect(needsUpgradeAfter).to.be.false;
+
+      // Create a V3 account directly
+      await simpleAccountFactoryV3.createAccount(
+        await otherAccounts[0].getAddress()
+      );
+      const v3AccountAddress = await simpleAccountFactoryV3.getAccountAddress(
+        await otherAccounts[0].getAddress()
+      );
+
+      const v3Account = await ethers.getContractAt(
+        "SimpleAccount",
+        v3AccountAddress
+      );
+
+      // Verify it's a V3 account
+      expect(await v3Account.version()).to.equal(3n);
+
+      // Check if upgrade is needed to V2 (should be false since V3 > V2)
+      const needsDowngrade = await simpleAccountFactoryV3.upgradeRequired(
+        v3AccountAddress,
+        await otherAccounts[0].getAddress(),
+        2
+      );
+      expect(needsDowngrade).to.be.false;
+    });
+
+    it("should handle legacy accounts and version parameters correctly", async () => {
+      // Get signers
+      const [deployer, ...otherAccounts] = await ethers.getSigners();
+
+      // Deploy B3TR token
+      const B3TR = await ethers.getContractFactory("B3TR_Mock");
+      const b3tr = await B3TR.deploy();
+      await b3tr.waitForDeployment();
+
+      // Deploy V1 factory
+      const simpleAccountFactoryV1 = (await deployProxy(
+        "SimpleAccountFactoryV1",
+        [] // initialize with no args
+      )) as SimpleAccountFactoryV1;
+
+      // Generate address for a new user
+      const legacyUser = otherAccounts[0];
+      const legacyAddress = await simpleAccountFactoryV1.getAccountAddress(
+        await legacyUser.getAddress()
+      );
+
+      // Send B3TR tokens to make it a legacy account without deploying
+      await b3tr.transfer(legacyAddress, ethers.parseEther("1"));
+
+      // Deploy V3 implementation for SimpleAccount
+      const SmartAccountV3 = await ethers.getContractFactory("SimpleAccount");
+      const smartAccountV3Implementation = await SmartAccountV3.deploy();
+      await smartAccountV3Implementation.waitForDeployment();
+
+      // Upgrade factory to V3
+      const simpleAccountFactoryV3 = (await upgradeProxy(
+        "SimpleAccountFactoryV1",
+        "SimpleAccountFactory",
+        await simpleAccountFactoryV1.getAddress(),
+        [
+          await smartAccountV3Implementation.getAddress(),
+          await b3tr.getAddress(),
+        ], // V3 initialization args
+        { version: 3 } // specify V3 initialization
+      )) as SimpleAccountFactory;
+
+      // Check if upgrade is needed to V3 before deployment
+      const needsUpgradeBefore = await simpleAccountFactoryV3.upgradeRequired(
+        legacyAddress,
+        await legacyUser.getAddress(),
+        3
+      );
+      expect(needsUpgradeBefore).to.be.true;
+
+      // Test with targetVersion = 0 (should use current version = 3)
+      const needsUpgradeWithZero = await simpleAccountFactoryV3.upgradeRequired(
+        legacyAddress,
+        await legacyUser.getAddress(),
+        0
+      );
+      expect(needsUpgradeWithZero).to.be.true;
+
+      // Verify current implementation version is 3
+      expect(
+        await simpleAccountFactoryV3.currentAccountImplementationVersion()
+      ).to.equal(3n);
+
+      // Try to check with targetVersion = 4 (greater than current version = 3)
+      await expect(
+        simpleAccountFactoryV3.upgradeRequired(
+          legacyAddress,
+          await legacyUser.getAddress(),
+          4
+        )
+      ).to.be.revertedWith(
+        "Target version must be less than or equal to the current version"
+      );
+
+      // Try to check with mismatched owner
+      const mismatchedOwner = otherAccounts[1];
+      const mismatchedAddress = await simpleAccountFactoryV3.getAccountAddress(
+        await mismatchedOwner.getAddress()
+      );
+
+      await expect(
+        simpleAccountFactoryV3.upgradeRequired(
+          legacyAddress,
+          await mismatchedOwner.getAddress(),
+          3
+        )
+      ).to.be.revertedWith(
+        "Account address does not match calculated address of owner"
+      );
+
+      // Now deploy the account
+      await simpleAccountFactoryV3.createAccount(await legacyUser.getAddress());
+
+      // Get the account contract
+      const legacyAccount = await ethers.getContractAt(
+        "SimpleAccount",
+        legacyAddress
+      );
+
+      // Verify it's a V1 account (since it had B3TR balance)
+      await expect(legacyAccount.version()).to.be.reverted;
+
+      // Check if upgrade is still needed after deployment (should still be true)
+      const needsUpgradeAfterDeploy =
+        await simpleAccountFactoryV3.upgradeRequired(
+          legacyAddress,
+          await legacyUser.getAddress(),
+          3
+        );
+      expect(needsUpgradeAfterDeploy).to.be.true;
+
+      // Now upgrade the account to V3
+      const implementationV3Address =
+        await simpleAccountFactoryV3.accountImplementationV3();
+      await legacyAccount
+        .connect(legacyUser)
+        .upgradeToAndCall(implementationV3Address, "0x");
+
+      // Verify it's now a V3 account
+      expect(await legacyAccount.version()).to.equal(3n);
+
+      // Check if upgrade is still needed (should be false now)
+      const needsUpgradeAfterUpgrade =
+        await simpleAccountFactoryV3.upgradeRequired(
+          legacyAddress,
+          await legacyUser.getAddress(),
+          3
+        );
+      expect(needsUpgradeAfterUpgrade).to.be.false;
+    });
   });
 
   describe("getAccountVersion", () => {

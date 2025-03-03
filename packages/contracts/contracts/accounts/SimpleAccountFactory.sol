@@ -469,6 +469,8 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
 
     /**
      * @dev Check if an account needs to be upgraded to a specific version
+     * @notice Only works for deployed accounts
+     *
      * @param accountAddress The address to check
      * @param targetVersion The version to check against
      * @return True if the account needs to be upgraded to the target version, false otherwise
@@ -477,6 +479,15 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         address accountAddress,
         uint256 targetVersion
     ) public view returns (bool) {
+        if (targetVersion == 0) {
+            targetVersion = currentAccountImplementationVersion();
+        } else {
+            require(
+                targetVersion <= currentAccountImplementationVersion(),
+                "Target version must be less than or equal to the current version"
+            );
+        }
+
         if (accountAddress.code.length == 0) {
             return false; // Not deployed yet, no upgrade needed
         }
@@ -497,5 +508,43 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         } catch {
             return true; // V1 accounts will fail version check, so they need upgrade
         }
+    }
+
+    /**
+     * @dev A helper to check if an account needs to be upgraded to a specific version (even if not deployed yet)
+     * @notice This function is intended for accounts generated with custom salt.
+     *
+     * @param account The address of the account
+     * @param owner The owner of the account
+     * @param targetVersion The version to check against, if 0 then it will check against the latest version
+     * @return True if the account needs to be upgraded to the target version, false otherwise
+     */
+    function upgradeRequired(
+        address account,
+        address owner,
+        uint256 targetVersion
+    ) public view returns (bool) {
+        if (targetVersion == 0) {
+            targetVersion = currentAccountImplementationVersion();
+        } else {
+            require(
+                targetVersion <= currentAccountImplementationVersion(),
+                "Target version must be less than or equal to the current version"
+            );
+        }
+
+        address calculatedAddress = getAccountAddress(owner);
+        require(
+            calculatedAddress == account,
+            "Account address does not match calculated address of owner"
+        );
+
+        // If the account is not deployed
+        // but it's legacy then it needs to be upgraded
+        if (account.code.length == 0) {
+            return hasLegacyAccount(owner);
+        }
+
+        return accountNeedsUpgradeToVersion(account, targetVersion);
     }
 }
