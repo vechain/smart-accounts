@@ -31,7 +31,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * - version() returns an integer, instead of a string.
  * - Fixed: createAccountWithSalt() method was using the getAccountAddress() method instead of getAccountAddressWithSalt()
  * - Fixed: emit AccountCreated after the account is created, so the address is not 0
- * - Added hasLegacyAccount() method to check if an owner has a legacy account
+ * - Added helper getters: hasLegacyAccount(), upgradeRequired(), upgradeRequiredForAccount()
  *
  * WARNING
  * Having a V3 of SimpleAccount means that the implementation address inside the factory changes, which causes the
@@ -468,14 +468,15 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     }
 
     /**
-     * @dev Check if an account needs to be upgraded to a specific version
-     * @notice Only works for deployed accounts
+     * @dev Check if an account needs to be upgraded to a specific version. Similar to
+     * @notice Only works for already deployed accounts
+     * @notice Does not work for accounts generated through custom salt
      *
      * @param accountAddress The address to check
      * @param targetVersion The version to check against
      * @return True if the account needs to be upgraded to the target version, false otherwise
      */
-    function accountNeedsUpgradeToVersion(
+    function upgradeRequiredForAccount(
         address accountAddress,
         uint256 targetVersion
     ) public view returns (bool) {
@@ -511,8 +512,9 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     }
 
     /**
-     * @dev A helper to check if an account needs to be upgraded to a specific version (even if not deployed yet)
-     * @notice This function is intended for accounts generated with custom salt.
+     * @dev A helper to check if an account needs to be upgraded to a specific version
+     * @notice This function is NOT intended to be used for accounts generated with custom salt.
+     * @notice This function will return TRUE for not deployed accounts, use
      *
      * @param account The address of the account
      * @param owner The owner of the account
@@ -540,11 +542,11 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         );
 
         // If the account is not deployed
-        // but it's legacy then it needs to be upgraded
         if (account.code.length == 0) {
+            // legacy accounts need to be upgraded
             return hasLegacyAccount(owner);
         }
 
-        return accountNeedsUpgradeToVersion(account, targetVersion);
+        return upgradeRequiredForAccount(account, targetVersion);
     }
 }

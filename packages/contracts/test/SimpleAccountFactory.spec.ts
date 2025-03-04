@@ -507,7 +507,7 @@ describe("SimpleAccountFactory", () => {
      *
      * After this I want to check that when user6 and user2 creates their account the version of
      * their account returns 3, while the version of all the other accounts
-     * (if not created then create it) has v1 (infact by calling accountNeedsUpgradeToVersion()
+     * (if not created then create it) has v1 (infact by calling upgradeRequired()
      * in the factory it should return true for all v1 and false for all v3).
      */
     it("It should preserve legacy wallets when upgrading to V3", async () => {
@@ -653,18 +653,12 @@ describe("SimpleAccountFactory", () => {
 
           // Should need upgrade
           expect(
-            await simpleAccountFactoryV3.accountNeedsUpgradeToVersion(
-              address,
-              3
-            )
+            await simpleAccountFactoryV3.upgradeRequiredForAccount(address, 3)
           ).to.be.true;
         } else {
           expect(await account.version()).to.equal(3n);
           expect(
-            await simpleAccountFactoryV3.accountNeedsUpgradeToVersion(
-              address,
-              3
-            )
+            await simpleAccountFactoryV3.upgradeRequiredForAccount(address, 3)
           ).to.be.false;
         }
       }
@@ -1575,7 +1569,7 @@ describe("SimpleAccountFactory", () => {
 
       // check if upgrade is needed (it shouldn't since it was created with V3 of factory)
       expect(
-        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+        await simpleAccountFactory.upgradeRequiredForAccount(
           smartAccountAddress,
           3
         )
@@ -1595,7 +1589,7 @@ describe("SimpleAccountFactory", () => {
 
       // check if upgrade is needed (it should since it was created with V1 of factory)
       expect(
-        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+        await simpleAccountFactory.upgradeRequiredForAccount(
           smartAccountAddress,
           3
         )
@@ -1618,10 +1612,7 @@ describe("SimpleAccountFactory", () => {
 
       // check that the account needs upgrade to v3
       expect(
-        await simpleAccountFactory.accountNeedsUpgradeToVersion(
-          accountAddress,
-          3
-        )
+        await simpleAccountFactory.upgradeRequiredForAccount(accountAddress, 3)
       ).to.be.false;
     });
 
@@ -1650,7 +1641,7 @@ describe("SimpleAccountFactory", () => {
 
       // Check if upgrade is needed to V3 (should return true since V2 < V3)
       expect(
-        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+        await simpleAccountFactory.upgradeRequiredForAccount(
           smartAccountAddress,
           3
         )
@@ -1658,7 +1649,7 @@ describe("SimpleAccountFactory", () => {
 
       // Check if upgrade is needed to V2 (should return false since account is at V2)
       expect(
-        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+        await simpleAccountFactory.upgradeRequiredForAccount(
           smartAccountAddress,
           2
         )
@@ -1666,7 +1657,7 @@ describe("SimpleAccountFactory", () => {
 
       // Check if upgrade is needed to V1 (should return false since V2 > V1)
       expect(
-        await simpleAccountFactory.accountNeedsUpgradeToVersion(
+        await simpleAccountFactory.upgradeRequiredForAccount(
           smartAccountAddress,
           1
         )
@@ -1773,7 +1764,7 @@ describe("SimpleAccountFactory", () => {
       expect(await v3Account.version()).to.equal(3n);
     });
 
-    it("should use current implementation version when targetVersion is 0 in accountNeedsUpgradeToVersion", async () => {
+    it("should use current implementation version when targetVersion is 0 in upgradeRequiredForAccount", async () => {
       // Get signers
       const [deployer, ...otherAccounts] = await ethers.getSigners();
 
@@ -1813,7 +1804,7 @@ describe("SimpleAccountFactory", () => {
 
       // Check if upgrade is needed with targetVersion = 0 (should use current version = 3)
       const needsUpgrade =
-        await simpleAccountFactoryV3.accountNeedsUpgradeToVersion(
+        await simpleAccountFactoryV3.upgradeRequiredForAccount(
           accountAddress,
           0
         );
@@ -1827,7 +1818,7 @@ describe("SimpleAccountFactory", () => {
       ).to.equal(3n);
     });
 
-    it("should revert when targetVersion is greater than current implementation version in accountNeedsUpgradeToVersion", async () => {
+    it("should revert when targetVersion is greater than current implementation version in upgradeRequiredForAccount", async () => {
       // Get signers
       const [deployer, ...otherAccounts] = await ethers.getSigners();
 
@@ -1867,7 +1858,7 @@ describe("SimpleAccountFactory", () => {
 
       // Try to check with targetVersion = 4 (greater than current version = 3)
       await expect(
-        simpleAccountFactoryV3.accountNeedsUpgradeToVersion(accountAddress, 4)
+        simpleAccountFactoryV3.upgradeRequiredForAccount(accountAddress, 4)
       ).to.be.revertedWith(
         "Target version must be less than or equal to the current version"
       );
