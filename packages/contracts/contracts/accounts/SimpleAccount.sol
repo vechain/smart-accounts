@@ -246,6 +246,54 @@ contract SimpleAccount is
     }
 
     /**
+     * @notice The domain separator is the same as the one used in the EIP-712 standard,
+     * but the chainId was renamed to stringifiedChainId, and instead of an uint256 it is a string.
+     *
+     * This was done to solve a compatibility issue for apps built with Swift programming language when
+     * signing typed data with the standard EIP-712 domain separator.
+     */
+    function executeBatchWithCustomAuthorization(
+        address[] calldata to,
+        uint256[] calldata value,
+        bytes[] calldata data,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        bytes calldata signature
+    ) external payable {
+        // Check array lengths match
+        require(
+            to.length == value.length && value.length == data.length,
+            "Array lengths mismatch"
+        );
+
+        // Check that the signature is not used yet
+        require(
+            !usedNonces[nonce],
+            "Nonce already used, please sign a new transaction"
+        );
+
+        // Check time validity for all transactions
+        require(block.timestamp > validAfter, "Authorization not yet valid");
+        require(block.timestamp < validBefore, "Authorization expired");
+
+        _validateBatchTransactionWithCustomDomain(
+            to,
+            value,
+            data,
+            validAfter,
+            validBefore,
+            nonce,
+            signature
+        );
+
+        // Execute each transaction
+        for (uint256 i = 0; i < to.length; i++) {
+            _call(to[i], value[i], data[i]);
+        }
+    }
+
+    /**
      * @dev Transfer ownership of the account
      * @param newOwner the new owner of the account
      */
@@ -346,6 +394,74 @@ contract SimpleAccount is
 
         address recoveredAddress = ECDSA.recover(digest, signature);
         require(recoveredAddress == owner, "Invalid signer");
+    }
+
+    /**
+     * @dev Validate a batch transaction with a custom EIP-712 domain separator
+     * @notice The domain separator is the same as the one used in the EIP-712 standard,
+     * but the chainId was renamed to stringifiedChainId, and instead of an uint256 it is a string.
+     *
+     * This was done to solve a compatibility issue for apps built with Swift programming language when
+     * signing typed data with the standard EIP-712 domain separator.
+     */
+    function _validateBatchTransactionWithCustomDomain(
+        address[] calldata to,
+        uint256[] calldata value,
+        bytes[] calldata data,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        bytes calldata signature
+    ) internal view {
+        bytes32 DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,string stringifiedChainId,address verifyingContract)"
+                ),
+                keccak256(bytes("Wallet")),
+                keccak256(bytes("1")),
+                keccak256(bytes(Strings.toString(block.chainid))),
+                address(this)
+            )
+        );
+
+        bytes32 typeHash = keccak256(
+            "ExecuteBatchWithAuthorization(address[] to,uint256[] value,bytes[] data,uint256 validAfter,uint256 validBefore,bytes32 nonce)"
+        );
+
+        // Hash arrays according to EIP-712 array encoding rules
+        bytes32[] memory dataHashes = new bytes32[](data.length);
+        for (uint256 i = 0; i < data.length; i++) {
+            dataHashes[i] = keccak256(data[i]);
+        }
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                typeHash,
+                keccak256(abi.encodePacked(to)),
+                keccak256(abi.encodePacked(value)),
+                keccak256(abi.encodePacked(dataHashes)),
+                validAfter,
+                validBefore,
+                nonce
+            )
+        );
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash)
+        );
+
+        address recoveredAddress = ECDSA.recover(digest, signature);
+        require(
+            recoveredAddress == owner,
+            string(
+                abi.encodePacked(
+                    "Invalid signer. Expected: ",
+                    Strings.toHexString(owner),
+                    " Got: ",
+                    Strings.toHexString(recoveredAddress)
+                )
+            )
+        );
     }
 
     // ---------- Internal ---------- //
