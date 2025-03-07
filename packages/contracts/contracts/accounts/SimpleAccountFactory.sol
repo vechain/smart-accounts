@@ -257,6 +257,63 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         emit AccountCreated(createdAccount, owner, salt);
     }
 
+    /**
+     * @dev Create an account with a specific implementation version, and return its address.
+     * Returns the address even if the account is already deployed.
+     *
+     * @notice Warning: use this only for testing purposes.
+     *
+     * @param owner The owner of the account
+     * @param _version The implementation version to use (1 or 3)
+     * @return createdAccount The created account
+     */
+    function createAccountWithVersion(
+        address owner,
+        uint256 _version
+    ) public returns (SimpleAccount createdAccount) {
+        require(
+            _version == 1 || _version == 3,
+            "Only versions 1 and 3 are supported"
+        );
+
+        uint256 salt = uint256(uint160(owner));
+
+        // Calculate address with the specified implementation
+        address implementation = _version == 1
+            ? address(accountImplementationV1)
+            : address(accountImplementationV3);
+
+        address accountAddress = Create2.computeAddress(
+            bytes32(salt),
+            keccak256(
+                abi.encodePacked(
+                    type(ERC1967Proxy).creationCode,
+                    abi.encode(
+                        implementation,
+                        abi.encodeCall(SimpleAccount.initialize, (owner))
+                    )
+                )
+            )
+        );
+
+        // Check if account already exists
+        if (accountAddress.code.length > 0) {
+            return SimpleAccount(payable(accountAddress));
+        }
+
+        // Deploy with specified implementation
+        createdAccount = SimpleAccount(
+            payable(
+                new ERC1967Proxy{salt: bytes32(salt)}(
+                    implementation,
+                    abi.encodeCall(SimpleAccount.initialize, (owner))
+                )
+            )
+        );
+
+        emit AccountCreated(createdAccount, owner, salt);
+    }
+
     // ---------- Getters ---------- //
 
     /**

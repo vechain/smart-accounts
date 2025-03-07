@@ -1338,6 +1338,149 @@ describe("SimpleAccountFactory", () => {
         ethers.parseEther("0")
       );
     });
+
+    describe("createAccountWithVersion", () => {
+      it("Can create a V1 account", async () => {
+        const { simpleAccountFactory, otherAccounts } =
+          await getOrDeployContracts(true);
+        const smartAccountOwner = otherAccounts[0];
+
+        // Create V1 account
+        const tx = await simpleAccountFactory.createAccountWithVersion(
+          await smartAccountOwner.getAddress(),
+          1
+        );
+        const receipt = await tx.wait();
+
+        // Get created account address from event
+        const event = receipt?.logs.filter(
+          (log) =>
+            log.topics[0] ===
+            simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
+        );
+        expect(event).to.not.be.undefined;
+        const accountAddress = event?.[0].args?.account;
+
+        // Verify account exists and has code
+        const codeAfter = await ethers.provider.getCode(accountAddress);
+        expect(codeAfter).to.not.equal("0x");
+        expect(codeAfter.length).to.be.greaterThan(2);
+
+        // Verify account owner
+        const smartAccountContract = await ethers.getContractAt(
+          "SimpleAccount",
+          accountAddress
+        );
+        const owner = await smartAccountContract.owner();
+        expect(owner).to.equal(await smartAccountOwner.getAddress());
+
+        // Verify account version (V1 accounts don't have version method, should revert)
+        await expect(smartAccountContract.version()).to.be.reverted;
+      });
+
+      it("Can create a V3 account", async () => {
+        const { simpleAccountFactory, otherAccounts } =
+          await getOrDeployContracts(true);
+        const smartAccountOwner = otherAccounts[0];
+
+        // Create V3 account
+        const tx = await simpleAccountFactory.createAccountWithVersion(
+          await smartAccountOwner.getAddress(),
+          3
+        );
+        const receipt = await tx.wait();
+
+        // Get created account address from event
+        const event = receipt?.logs.filter(
+          (log) =>
+            log.topics[0] ===
+            simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
+        );
+        expect(event).to.not.be.undefined;
+        const accountAddress = event?.[0].args?.account;
+
+        // Verify account exists and has code
+        const codeAfter = await ethers.provider.getCode(accountAddress);
+        expect(codeAfter).to.not.equal("0x");
+        expect(codeAfter.length).to.be.greaterThan(2);
+
+        // Verify account owner
+        const smartAccountContract = await ethers.getContractAt(
+          "SimpleAccount",
+          accountAddress
+        );
+        const owner = await smartAccountContract.owner();
+        expect(owner).to.equal(await smartAccountOwner.getAddress());
+
+        // Verify account version is 3
+        const version = await smartAccountContract.version();
+        expect(version).to.equal(3);
+      });
+
+      it("Returns existing account if already deployed", async () => {
+        const { simpleAccountFactory, otherAccounts } =
+          await getOrDeployContracts(true);
+        const smartAccountOwner = otherAccounts[0];
+
+        // Create account first time
+        const tx1 = await simpleAccountFactory.createAccountWithVersion(
+          await smartAccountOwner.getAddress(),
+          3
+        );
+        const receipt1 = await tx1.wait();
+        const event1 = receipt1?.logs.filter(
+          (log) =>
+            log.topics[0] ===
+            simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
+        );
+        const firstAddress = event1?.[0].args?.account;
+        expect(firstAddress).to.not.be.undefined;
+
+        // Try to create same account again
+        const tx2 = await simpleAccountFactory.createAccountWithVersion(
+          await smartAccountOwner.getAddress(),
+          3
+        );
+        const receipt2 = await tx2.wait();
+        const event2 = receipt2?.logs.filter(
+          (log) =>
+            log.topics[0] ===
+            simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
+        );
+        // expect to not have any event (empty array), since account was already created in the past
+        expect(event2).to.be.empty;
+      });
+
+      it("Reverts when using unsupported version", async () => {
+        const { simpleAccountFactory, otherAccounts } =
+          await getOrDeployContracts(true);
+        const smartAccountOwner = otherAccounts[0];
+
+        // Try to create account with version 2
+        await expect(
+          simpleAccountFactory.createAccountWithVersion(
+            await smartAccountOwner.getAddress(),
+            2
+          )
+        ).to.be.revertedWith("Only versions 1 and 3 are supported");
+
+        // Try to create account with version 0
+        await expect(
+          simpleAccountFactory.createAccountWithVersion(
+            await smartAccountOwner.getAddress(),
+            0
+          )
+        ).to.be.revertedWith("Only versions 1 and 3 are supported");
+
+        // Try to create account with version 4
+        await expect(
+          simpleAccountFactory.createAccountWithVersion(
+            await smartAccountOwner.getAddress(),
+            4
+          )
+        ).to.be.revertedWith("Only versions 1 and 3 are supported");
+      });
+    });
   });
 
   describe("SimpleAccount management", () => {
