@@ -45,6 +45,6 @@ export const useContractVersion = (contractAddress: string, env: EnvConfig) => {
   return useQuery({
     queryKey: getVersionQueryKey(contractAddress, env),
     queryFn: async () => getVersion(thor, contractAddress),
-    enabled: !!thor,
+    enabled: !!thor && !!contractAddress && !!env,
   });
 };

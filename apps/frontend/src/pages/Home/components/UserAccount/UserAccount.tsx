@@ -14,29 +14,38 @@ import {
   useIsAccountDeployed,
   useCreateAccount,
   useGetAccountAddress,
+  useSmartAccountVersion,
 } from "../../../../hooks";
 import { useCallback, useEffect, useState } from "react";
 import { useTxReceipt } from "../../../../utils/hooks/useTxReceipt";
 
 type UserAccountProps = {
   env: EnvConfig;
-  account?: string;
+  ownerAddress?: string;
   showDeployButton?: boolean;
 };
 
 export const UserAccount = ({
   env,
-  account,
+  ownerAddress,
   showDeployButton = true,
 }: UserAccountProps) => {
   const { data: smartAccountAddress } = useGetAccountAddress(
-    account ?? "",
+    ownerAddress ?? "",
     env
   );
   const { data: isAccountDeployed } = useIsAccountDeployed(
     env,
     smartAccountAddress
   );
+  const { data: accountVersion } = useSmartAccountVersion(
+    smartAccountAddress ?? "",
+    ownerAddress ?? "",
+    env
+  );
+
+  console.log("accountVersion", accountVersion);
+
   const toast = useToast();
   const [isTxLoading, setIsTxLoading] = useState(false);
 
@@ -44,11 +53,11 @@ export const UserAccount = ({
     useCreateAccount({});
 
   const onCreateAccount = useCallback(() => {
-    if (!account) return;
+    if (!ownerAddress) return;
 
     setIsTxLoading(true);
-    sendTransaction({ owner: account, env });
-  }, [sendTransaction, account, env]);
+    sendTransaction({ owner: ownerAddress, env });
+  }, [sendTransaction, ownerAddress, env]);
 
   const { data: txReceipt } = useTxReceipt(sendTransactionTx?.txid ?? "");
 
@@ -106,7 +115,7 @@ export const UserAccount = ({
     setIsTxLoading(false);
   }, [txReceipt, toast, setIsTxLoading, sendTransactionError]);
 
-  if (!account) {
+  if (!ownerAddress) {
     return null;
   }
 
@@ -136,6 +145,12 @@ export const UserAccount = ({
                 Deployed
               </Text>
               <Text fontSize="md">{isAccountDeployed ? "Yes" : "No"}</Text>
+            </HStack>
+            <HStack w="full" justify={"space-between"}>
+              <Text fontSize="md" wordBreak={"break-word"} fontWeight={600}>
+                Version
+              </Text>
+              <Text fontSize="md">{accountVersion}</Text>
             </HStack>
             <HStack w="full" justify={"end"}>
               {!isAccountDeployed && showDeployButton && (

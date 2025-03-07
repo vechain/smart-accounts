@@ -30,6 +30,6 @@ export const useIsAccountDeployed = (env: EnvConfig, address?: string) => {
       if (!address) return false;
       return getIsAccountDeployed(thor, address);
     },
-    enabled: !!address && !!thor,
+    enabled: !!address && !!thor && !!env,
   });
 };
