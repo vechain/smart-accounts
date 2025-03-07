@@ -177,29 +177,27 @@ export const Readme = () => {
 
           <Divider />
 
-          <Text>
-            The contracts are deployed on the following networks:
-            <List spacing={3} styleType="disc">
-              <ListItem>
-                <b>Mainnet</b>:{" "}
-                <Link
-                  isExternal
-                  href="https://vechainstats.com/account/0xc06ad8573022e2be416ca89da47e8c592971679a/"
-                >
-                  0xC06Ad8573022e2BE416CA89DA47E8c592971679A
-                </Link>
-              </ListItem>
-              <ListItem>
-                <b>Testnet</b>:{" "}
-                <Link
-                  isExternal
-                  href="https://explore-testnet.vechain.org/accounts/0x713b908Bcf77f3E00EFEf328E50b657a1A23AeaF"
-                >
-                  0x713b908Bcf77f3E00EFEf328E50b657a1A23AeaF
-                </Link>
-              </ListItem>
-            </List>
-          </Text>
+          <Text>The contracts are deployed on the following networks:</Text>
+          <VStack align="stretch" spacing={4}>
+            <Text>
+              <b>Mainnet</b>:{" "}
+              <Link
+                isExternal
+                href="https://vechainstats.com/account/0xc06ad8573022e2be416ca89da47e8c592971679a/"
+              >
+                0xC06Ad8573022e2BE416CA89DA47E8c592971679A
+              </Link>
+            </Text>
+            <Text>
+              <b>Testnet</b>:{" "}
+              <Link
+                isExternal
+                href="https://explore-testnet.vechain.org/accounts/0x713b908Bcf77f3E00EFEf328E50b657a1A23AeaF"
+              >
+                0x713b908Bcf77f3E00EFEf328E50b657a1A23AeaF
+              </Link>
+            </Text>
+          </VStack>
 
           <Text>
             For detailed documentation and implementation details, check out the{" "}
