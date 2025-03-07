@@ -1263,6 +1263,81 @@ describe("SimpleAccountFactory", () => {
       expect(events1?.length).to.equal(1);
       expect(events2?.length).to.equal(0);
     });
+
+    it("should prevent salt generation attack on unclaimed accounts with b3tr balance", async () => {
+      const { b3tr, otherAccounts, simpleAccountFactory } =
+        await getOrDeployContracts(true);
+
+      const [user1, attacker] = otherAccounts;
+
+      // Get user1's future account address using getAccountAddress (which uses owner as salt)
+      const user1AccountAddress = await simpleAccountFactory.getAccountAddress(
+        await user1.getAddress()
+      );
+
+      // Send b3tr tokens to the future account address
+      await b3tr.transfer(user1AccountAddress, ethers.parseEther("1"));
+
+      // Attacker tries to generate the same salt by converting user1's address to uint
+      const maliciousSalt = BigInt(await user1.getAddress());
+
+      // Attacker tries to create account with that salt to claim the b3tr tokens
+      await simpleAccountFactory.createAccountWithSalt(
+        await attacker.getAddress(),
+        maliciousSalt.toString()
+      );
+
+      // attacker can move funds
+      const simpleAccount = await ethers.getContractAt(
+        "SimpleAccount",
+        user1AccountAddress
+      );
+
+      // use ExecuteWithAuthorization to move funds
+      const chainId = await ethers.provider.getNetwork().then((n) => n.chainId);
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: Number(chainId),
+        verifyingContract: user1AccountAddress,
+      };
+
+      const types = {
+        ExecuteWithAuthorization: [
+          { name: "to", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "data", type: "bytes" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+        ],
+      };
+
+      // Upgrade first account
+      const message1 = {
+        to: await b3tr.getAddress(),
+        value: ethers.parseEther("0"),
+        data: b3tr.interface.encodeFunctionData("transfer", [
+          await attacker.getAddress(),
+          ethers.parseEther("1"),
+        ]),
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 360,
+      };
+
+      const signature1 = await attacker.signTypedData(domain, types, message1);
+      await simpleAccount.executeWithAuthorization(
+        message1.to,
+        message1.value,
+        message1.data,
+        message1.validAfter,
+        message1.validBefore,
+        signature1
+      );
+
+      expect(await b3tr.balanceOf(await attacker.getAddress())).to.equal(
+        ethers.parseEther("0")
+      );
+    });
   });
 
   describe("SimpleAccount management", () => {
