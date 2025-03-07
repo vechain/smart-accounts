@@ -1,23 +1,11 @@
-import {
-  Button,
-  Card,
-  CardBody,
-  HStack,
-  Link,
-  Text,
-  VStack,
-  useToast,
-} from "@chakra-ui/react";
+import { Card, CardBody, HStack, Text, VStack } from "@chakra-ui/react";
 import { EnvConfig } from "@repo/config/contracts";
 import { AddressButtonGhostVariant } from "../../../../components";
 import {
   useIsAccountDeployed,
-  useCreateAccount,
   useGetAccountAddress,
   useSmartAccountVersion,
 } from "../../../../hooks";
-import { useCallback, useEffect, useState } from "react";
-import { useTxReceipt } from "../../../../utils/hooks/useTxReceipt";
 
 type UserAccountProps = {
   env: EnvConfig;
@@ -25,11 +13,7 @@ type UserAccountProps = {
   showDeployButton?: boolean;
 };
 
-export const UserAccount = ({
-  env,
-  ownerAddress,
-  showDeployButton = true,
-}: UserAccountProps) => {
+export const UserAccount = ({ env, ownerAddress }: UserAccountProps) => {
   const { data: smartAccountAddress } = useGetAccountAddress(
     ownerAddress ?? "",
     env
@@ -43,77 +27,6 @@ export const UserAccount = ({
     ownerAddress ?? "",
     env
   );
-
-  console.log("accountVersion", accountVersion);
-
-  const toast = useToast();
-  const [isTxLoading, setIsTxLoading] = useState(false);
-
-  const { sendTransaction, sendTransactionTx, sendTransactionError } =
-    useCreateAccount({});
-
-  const onCreateAccount = useCallback(() => {
-    if (!ownerAddress) return;
-
-    setIsTxLoading(true);
-    sendTransaction({ owner: ownerAddress, env });
-  }, [sendTransaction, ownerAddress, env]);
-
-  const { data: txReceipt } = useTxReceipt(sendTransactionTx?.txid ?? "");
-
-  useEffect(() => {
-    if (sendTransactionError) {
-      setIsTxLoading(false);
-      return;
-    }
-
-    if (!txReceipt) return;
-
-    if (!txReceipt.reverted) {
-      toast({
-        title: "Success",
-        description: (
-          <Text>
-            Account created successfully. Tx:{" "}
-            <Link
-              href={
-                "https://vechainstats.com/transaction/" + txReceipt.meta.txID
-              }
-              isExternal
-            >
-              {txReceipt.meta.txID}
-            </Link>
-          </Text>
-        ),
-        status: "success",
-        duration: 9000,
-        isClosable: true,
-        position: "bottom-left",
-      });
-    } else if (txReceipt?.reverted) {
-      toast({
-        title: "Error",
-        description: (
-          <Text>
-            Account created failed. Tx:{" "}
-            <Link
-              href={
-                "https://vechainstats.com/transaction/" + txReceipt.meta.txID
-              }
-              isExternal
-            >
-              {txReceipt.meta.txID}
-            </Link>
-          </Text>
-        ),
-        status: "error",
-        duration: 9000,
-        isClosable: true,
-        position: "bottom-left",
-      });
-    }
-    setIsTxLoading(false);
-  }, [txReceipt, toast, setIsTxLoading, sendTransactionError]);
 
   if (!ownerAddress) {
     return null;
@@ -151,18 +64,6 @@ export const UserAccount = ({
                 Version
               </Text>
               <Text fontSize="md">{accountVersion}</Text>
-            </HStack>
-            <HStack w="full" justify={"end"}>
-              {!isAccountDeployed && showDeployButton && (
-                <Button
-                  w={"full"}
-                  variant={"outline"}
-                  onClick={onCreateAccount}
-                  isLoading={isTxLoading}
-                >
-                  Deploy now
-                </Button>
-              )}
             </HStack>
           </VStack>
         </VStack>
