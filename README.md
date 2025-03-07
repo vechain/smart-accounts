@@ -29,7 +29,7 @@ Currently the smart accounts created through this factory are used to enable soc
 
 ### Testnet
 
-[0x7EABA81B4F3741Ac381af7e025f3B6e0428F05Fb](https://explore-testnet.vechain.org/accounts/0x7eaba81b4f3741ac381af7e025f3b6e0428f05fb)
+[0x713b908Bcf77f3E00EFEf328E50b657a1A23AeaF](https://explore-testnet.vechain.org/accounts/0x713b908Bcf77f3E00EFEf328E50b657a1A23AeaF)
 
 ## How it works
 
