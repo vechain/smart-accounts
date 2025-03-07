@@ -57,7 +57,7 @@ export const ContractInfo = ({
             <Text fontSize="md" fontWeight={600}>
               {isLoadingCreatedAccoounts
                 ? "Loading..."
-                : accountsCreatedEvents?.created.length}
+                : accountsCreatedEvents?.totalCreated}
             </Text>
           </HStack>
         </VStack>
