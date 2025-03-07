@@ -7,7 +7,7 @@ import Connex from "@vechain/connex";
 const SimpleAccountFactoryInterface =
   SimpleAccountFactory__factory.createInterface();
 
-export const getVersion = async (
+export const getSmartAccountVersion = async (
   thor: Connex.Thor,
   smartAccountAddress: string,
   ownerAddress: string,
@@ -28,7 +28,7 @@ export const getVersion = async (
   return parseInt(res.decoded[0]);
 };
 
-export const getVersionQueryKey = (
+export const getSmartAccountVersionQueryKey = (
   smartAccountAddress: string,
   ownerAddress: string,
   env: EnvConfig
@@ -51,9 +51,13 @@ export const useSmartAccountVersion = (
   });
 
   return useQuery({
-    queryKey: getVersionQueryKey(smartAccountAddress, ownerAddress, env),
+    queryKey: getSmartAccountVersionQueryKey(
+      smartAccountAddress,
+      ownerAddress,
+      env
+    ),
     queryFn: async () =>
-      getVersion(thor, smartAccountAddress, ownerAddress, env),
+      getSmartAccountVersion(thor, smartAccountAddress, ownerAddress, env),
     enabled: !!thor && !!smartAccountAddress && !!ownerAddress && !!env,
   });
 };
