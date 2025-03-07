@@ -287,6 +287,8 @@ contract SimpleAccount is
             signature
         );
 
+        usedNonces[nonce] = true;
+
         // Execute each transaction
         for (uint256 i = 0; i < to.length; i++) {
             _call(to[i], value[i], data[i]);
@@ -399,10 +401,15 @@ contract SimpleAccount is
     /**
      * @dev Validate a batch transaction with a custom EIP-712 domain separator
      * @notice The domain separator is the same as the one used in the EIP-712 standard,
-     * but the chainId was renamed to stringifiedChainId, and instead of an uint256 it is a string.
+     * but the chainId is calculated differently in order to support iOS and Android programming
+     * languages (which do not handle correctly VeChain chainId).
      *
-     * This was done to solve a compatibility issue for apps built with Swift programming language when
-     * signing typed data with the standard EIP-712 domain separator.
+     * The chainId used here is obtained by doing a bitwise AND operation between the chain ID
+     * and the hexadecimal number 0xFFFFFFFF. This operation effectively limits the chain ID
+     * to 32 bits (4 bytes) by masking off any higher bits. In other words,
+     * it takes only the least significant 32 bits of the chain ID. For example:
+     * - If chain ID is 1 (Ethereum mainnet): No change (since 1 fits in 32 bits)
+     * - If chain ID is a very large number: Only the lowest 32 bits are kept
      */
     function _validateBatchTransactionWithCustomDomain(
         address[] calldata to,
@@ -416,11 +423,11 @@ contract SimpleAccount is
         bytes32 DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256(
-                    "EIP712Domain(string name,string version,string stringifiedChainId,address verifyingContract)"
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
                 ),
                 keccak256(bytes("Wallet")),
                 keccak256(bytes("1")),
-                keccak256(bytes(Strings.toString(block.chainid))),
+                block.chainid & 0xFFFFFFFF,
                 address(this)
             )
         );
@@ -482,6 +489,50 @@ contract SimpleAccount is
     }
 
     // ---------- Getters ---------- //
+
+    /**
+     * @dev Returns the custom domain separator parameters used by
+     * executeBatchWithCustomAuthorization() for iOS/Android compatibility, where the chainId is
+     * calculated differently than in the standard EIP-712 domain separator.
+     */
+    function customEip712Domain()
+        public
+        view
+        returns (
+            bytes1 fields,
+            string memory name,
+            string memory customDomainVersion,
+            uint256 chainId,
+            address verifyingContract,
+            bytes32 salt,
+            uint256[] memory extensions
+        )
+    {
+        return (
+            hex"0f", // 01111 (same as standard EIP712 - represents which fields are present)
+            "Wallet",
+            "1",
+            customChainId(),
+            address(this),
+            bytes32(0),
+            new uint256[](0)
+        );
+    }
+
+    /**
+     * @dev Returns the custom chainId obtained by doing a bitwise AND operation between the chain ID
+     * and the hexadecimal number 0xFFFFFFFF. This operation effectively limits the chain ID
+     * to 32 bits (4 bytes) by masking off any higher bits. In other words,
+     * it takes only the least significant 32 bits of the chain ID. For example:
+     * - If chain ID is 1 (Ethereum mainnet): No change (since 1 fits in 32 bits)
+     * - If chain ID is a very large number: Only the lowest 32 bits are kept
+     *
+     * This is done to solve a compatibility issue for apps built with Swift programming language when
+     * signing typed data with the standard EIP-712 domain separator.
+     */
+    function customChainId() public view returns (uint256) {
+        return block.chainid & 0xFFFFFFFF;
+    }
 
     // ---------- Fallback ---------- //
 

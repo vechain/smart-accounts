@@ -333,7 +333,7 @@ describe("SimpleAccountFactory", () => {
         value: ethers.parseEther("0"),
         data: upgradeData,
         validAfter: 0,
-        validBefore: Math.floor(Date.now() / 1000) + 360,
+        validBefore: Math.floor(Date.now() / 1000) + 3060,
       };
 
       const signature1 = await owner1.signTypedData(domain, types, message1);
@@ -354,7 +354,7 @@ describe("SimpleAccountFactory", () => {
         value: ethers.parseEther("0"),
         data: upgradeData,
         validAfter: 0,
-        validBefore: Math.floor(Date.now() / 1000) + 360,
+        validBefore: Math.floor(Date.now() / 1000) + 3600,
       };
 
       const signature2 = await owner2.signTypedData(domain, types, message2);
@@ -1359,6 +1359,7 @@ describe("SimpleAccountFactory", () => {
             simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
         );
         expect(event).to.not.be.undefined;
+        // @ts-ignore
         const accountAddress = event?.[0].args?.account;
 
         // Verify account exists and has code
@@ -1397,6 +1398,7 @@ describe("SimpleAccountFactory", () => {
             simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
         );
         expect(event).to.not.be.undefined;
+        // @ts-ignore
         const accountAddress = event?.[0].args?.account;
 
         // Verify account exists and has code
@@ -1433,6 +1435,7 @@ describe("SimpleAccountFactory", () => {
             log.topics[0] ===
             simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
         );
+        // @ts-ignore
         const firstAddress = event1?.[0].args?.account;
         expect(firstAddress).to.not.be.undefined;
 
