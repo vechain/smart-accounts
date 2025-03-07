@@ -1003,7 +1003,7 @@ describe("SimpleAccount", () => {
       const chainId = await ethers.provider
         .getNetwork()
         .then((n) => Number(n.chainId));
-      const customChainId = chainId & 0xffffffff; // Apply the mask as done in the contract
+      const customChainId = chainId & 0xffff; // Apply the mask as done in the contract
 
       const domain = {
         name: "Wallet",
@@ -1084,7 +1084,7 @@ describe("SimpleAccount", () => {
       const chainId = await ethers.provider
         .getNetwork()
         .then((n) => Number(n.chainId));
-      const customChainId = chainId & 0xffffffff;
+      const customChainId = chainId & 0xffff;
 
       const domain = {
         name: "Wallet",
@@ -1163,7 +1163,7 @@ describe("SimpleAccount", () => {
 
       const expectedChainId =
         (await ethers.provider.getNetwork().then((n) => Number(n.chainId))) &
-        0xffffffff;
+        0xffff;
       expect(chainId).to.equal(expectedChainId);
     });
 
@@ -1174,7 +1174,7 @@ describe("SimpleAccount", () => {
       const chainId = await ethers.provider
         .getNetwork()
         .then((n) => Number(n.chainId));
-      const customChainId = chainId & 0xffffffff;
+      const customChainId = chainId & 0xffff;
 
       const domain = {
         name: "Wallet",
@@ -1225,7 +1225,7 @@ describe("SimpleAccount", () => {
       const chainId = await ethers.provider
         .getNetwork()
         .then((n) => Number(n.chainId));
-      const customChainId = chainId & 0xffffffff;
+      const customChainId = chainId & 0xffff;
 
       const domain = {
         name: "Wallet",
@@ -1276,7 +1276,7 @@ describe("SimpleAccount", () => {
       const chainId = await ethers.provider
         .getNetwork()
         .then((n) => Number(n.chainId));
-      const customChainId = chainId & 0xffffffff;
+      const customChainId = chainId & 0xffff;
 
       const domain = {
         name: "Wallet",

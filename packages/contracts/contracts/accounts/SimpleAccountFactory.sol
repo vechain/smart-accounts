@@ -32,6 +32,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * - Fixed: createAccountWithSalt() method was using the getAccountAddress() method instead of getAccountAddressWithSalt()
  * - Fixed: emit AccountCreated after the account is created, so the address is not 0
  * - Added helper getters: hasLegacyAccount(), upgradeRequired(), upgradeRequiredForAccount()
+ * - Added createAccountWithVersion() method to create an account with a specific version (to be used for testing purposes during the upgrade).
  *
  * WARNING
  * Having a V3 of SimpleAccount means that the implementation address inside the factory changes, which causes the

@@ -27,6 +27,8 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * - Added executeBatchWithAuthorization() method, so multiple clauses can be signed at once.
  * - Using nonces in new executeBatchWithAuthorization() method to prevent replay attacks (executeWithAuthorization() remains without nonces for backwards compatibility).
  * - version() returns an integer, instead of a string.
+ * - Added customChainId() method that parses the chainId to 16 bits to avoid issues with iOS and Android programming languages.
+ * - Added executeBatchWithCustomAuthorization() method that uses a custom EIP-712 domain separator for iOS and Android compatibility.
  */
 contract SimpleAccount is
     Initializable,
@@ -405,11 +407,11 @@ contract SimpleAccount is
      * languages (which do not handle correctly VeChain chainId).
      *
      * The chainId used here is obtained by doing a bitwise AND operation between the chain ID
-     * and the hexadecimal number 0xFFFFFFFF. This operation effectively limits the chain ID
-     * to 32 bits (4 bytes) by masking off any higher bits. In other words,
-     * it takes only the least significant 32 bits of the chain ID. For example:
-     * - If chain ID is 1 (Ethereum mainnet): No change (since 1 fits in 32 bits)
-     * - If chain ID is a very large number: Only the lowest 32 bits are kept
+     * and the hexadecimal number 0xFFFF. This operation effectively limits the chain ID
+     * to 16 bits (2 bytes) by masking off any higher bits. In other words,
+     * it takes only the least significant 16 bits of the chain ID. For example:
+     * - VeChain Mainnet: 0x1B4A (6986 in decimal)
+     * - VeChain Testnet: 0xB127 (45351 in decimal)
      */
     function _validateBatchTransactionWithCustomDomain(
         address[] calldata to,
@@ -427,7 +429,7 @@ contract SimpleAccount is
                 ),
                 keccak256(bytes("Wallet")),
                 keccak256(bytes("1")),
-                block.chainid & 0xFFFFFFFF,
+                block.chainid & 0xFFFF,
                 address(this)
             )
         );
@@ -521,17 +523,17 @@ contract SimpleAccount is
 
     /**
      * @dev Returns the custom chainId obtained by doing a bitwise AND operation between the chain ID
-     * and the hexadecimal number 0xFFFFFFFF. This operation effectively limits the chain ID
-     * to 32 bits (4 bytes) by masking off any higher bits. In other words,
-     * it takes only the least significant 32 bits of the chain ID. For example:
-     * - If chain ID is 1 (Ethereum mainnet): No change (since 1 fits in 32 bits)
-     * - If chain ID is a very large number: Only the lowest 32 bits are kept
+     * and the hexadecimal number 0xFFFF. This operation effectively limits the chain ID
+     * to 16 bits (2 bytes) by masking off any higher bits. In other words,
+     * it takes only the least significant 16 bits of the chain ID. For example:
+     * - VeChain Mainnet: 0x1B4A (6986 in decimal)
+     * - VeChain Testnet: 0xB127 (45351 in decimal)
      *
      * This is done to solve a compatibility issue for apps built with Swift programming language when
      * signing typed data with the standard EIP-712 domain separator.
      */
     function customChainId() public view returns (uint256) {
-        return block.chainid & 0xFFFFFFFF;
+        return block.chainid & 0xFFFF;
     }
 
     // ---------- Fallback ---------- //
