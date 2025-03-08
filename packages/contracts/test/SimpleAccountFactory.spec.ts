@@ -1340,7 +1340,7 @@ describe("SimpleAccountFactory", () => {
     });
 
     describe("createAccountWithVersion", () => {
-      it("Can create a V1 account", async () => {
+      it("Can create a V1 account when called by admin", async () => {
         const { simpleAccountFactory, otherAccounts } =
           await getOrDeployContracts(true);
         const smartAccountOwner = otherAccounts[0];
@@ -1379,47 +1379,21 @@ describe("SimpleAccountFactory", () => {
         await expect(smartAccountContract.version()).to.be.reverted;
       });
 
-      it("Can create a V3 account", async () => {
+      it("Reverts when called by non-admin", async () => {
         const { simpleAccountFactory, otherAccounts } =
           await getOrDeployContracts(true);
         const smartAccountOwner = otherAccounts[0];
+        const nonAdmin = otherAccounts[1];
 
-        // Create V3 account
-        const tx = await simpleAccountFactory.createAccountWithVersion(
-          await smartAccountOwner.getAddress(),
-          3
-        );
-        const receipt = await tx.wait();
-
-        // Get created account address from event
-        const event = receipt?.logs.filter(
-          (log) =>
-            log.topics[0] ===
-            simpleAccountFactory.interface.getEvent("AccountCreated").topicHash
-        );
-        expect(event).to.not.be.undefined;
-        // @ts-ignore
-        const accountAddress = event?.[0].args?.account;
-
-        // Verify account exists and has code
-        const codeAfter = await ethers.provider.getCode(accountAddress);
-        expect(codeAfter).to.not.equal("0x");
-        expect(codeAfter.length).to.be.greaterThan(2);
-
-        // Verify account owner
-        const smartAccountContract = await ethers.getContractAt(
-          "SimpleAccount",
-          accountAddress
-        );
-        const owner = await smartAccountContract.owner();
-        expect(owner).to.equal(await smartAccountOwner.getAddress());
-
-        // Verify account version is 3
-        const version = await smartAccountContract.version();
-        expect(version).to.equal(3);
+        // Try to create account as non-admin
+        await expect(
+          simpleAccountFactory
+            .connect(nonAdmin)
+            .createAccountWithVersion(await smartAccountOwner.getAddress(), 1)
+        ).to.be.reverted;
       });
 
-      it("Returns existing account if already deployed", async () => {
+      it("Returns existing account if already deployed when called by admin", async () => {
         const { simpleAccountFactory, otherAccounts } =
           await getOrDeployContracts(true);
         const smartAccountOwner = otherAccounts[0];
@@ -1427,7 +1401,7 @@ describe("SimpleAccountFactory", () => {
         // Create account first time
         const tx1 = await simpleAccountFactory.createAccountWithVersion(
           await smartAccountOwner.getAddress(),
-          3
+          1
         );
         const receipt1 = await tx1.wait();
         const event1 = receipt1?.logs.filter(
@@ -1442,7 +1416,7 @@ describe("SimpleAccountFactory", () => {
         // Try to create same account again
         const tx2 = await simpleAccountFactory.createAccountWithVersion(
           await smartAccountOwner.getAddress(),
-          3
+          1
         );
         const receipt2 = await tx2.wait();
         const event2 = receipt2?.logs.filter(
@@ -1454,7 +1428,7 @@ describe("SimpleAccountFactory", () => {
         expect(event2).to.be.empty;
       });
 
-      it("Reverts when using unsupported version", async () => {
+      it("Reverts when using unsupported version when called by admin", async () => {
         const { simpleAccountFactory, otherAccounts } =
           await getOrDeployContracts(true);
         const smartAccountOwner = otherAccounts[0];

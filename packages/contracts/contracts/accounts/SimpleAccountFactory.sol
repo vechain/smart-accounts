@@ -271,7 +271,11 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     function createAccountWithVersion(
         address owner,
         uint256 _version
-    ) public returns (SimpleAccount createdAccount) {
+    )
+        public
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        returns (SimpleAccount createdAccount)
+    {
         require(
             _version == 1 || _version == 3,
             "Only versions 1 and 3 are supported"
