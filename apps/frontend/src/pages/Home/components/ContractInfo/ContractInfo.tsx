@@ -16,7 +16,7 @@ import {
 import { EnvConfig } from "@repo/config/contracts";
 import { useContractVersion } from "../../../../hooks/useContractVersion";
 import { FaSync } from "react-icons/fa";
-import { queryClient } from "../../../../utils/queryClient";
+import { useQueryClient } from "@tanstack/react-query";
 
 type ContractAddressAndBalanceCardProps = {
   title: string;
@@ -29,6 +29,7 @@ export const ContractInfo = ({
   address,
   env,
 }: ContractAddressAndBalanceCardProps) => {
+  const queryClient = useQueryClient();
   const { data: contractVersion } = useContractVersion(address, env);
 
   const { data: accountsCreatedEvents, isLoading: isLoadingCreatedAccoounts } =
