@@ -15,9 +15,8 @@ export type AccountCreatedEvent = {
 // some scalability issues (calling thousends of events)
 // so we are taking a snapshot at a specific block and then
 // fetching the events from that block
-// const MAINNET_SNAPSHOT_BLOCK = 21134975;
-const MAINNET_SNAPSHOT_BLOCK = 21134975;
-const MAINNET_CREATED_ACCOUNTS_COUNT_AT_SNAPSHOT = 135143;
+const MAINNET_SNAPSHOT_BLOCK = 21086312;
+const MAINNET_CREATED_ACCOUNTS_COUNT_AT_SNAPSHOT = 135243;
 
 export const getAccountsCreatedEvents = async (
   thor: Connex.Thor,
