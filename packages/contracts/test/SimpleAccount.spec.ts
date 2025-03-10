@@ -1003,12 +1003,12 @@ describe("SimpleAccount", () => {
       const chainId = await ethers.provider
         .getNetwork()
         .then((n) => Number(n.chainId));
-      const customChainId = chainId & 0xffff; // Apply the mask as done in the contract
+      const maskedChainId = chainId & 0xffff; // Apply the mask as done in the contract
 
       const domain = {
         name: "Wallet",
         version: "1",
-        chainId: Number(customChainId),
+        chainId: Number(maskedChainId),
         verifyingContract: await smartAccount.getAddress(),
       };
 
@@ -1084,12 +1084,12 @@ describe("SimpleAccount", () => {
       const chainId = await ethers.provider
         .getNetwork()
         .then((n) => Number(n.chainId));
-      const customChainId = chainId & 0xffff;
+      const maskedChainId = chainId & 0xffff;
 
       const domain = {
         name: "Wallet",
         version: "1",
-        chainId: Number(customChainId),
+        chainId: Number(maskedChainId),
         verifyingContract: await smartAccount.getAddress(),
       };
 
@@ -1174,12 +1174,12 @@ describe("SimpleAccount", () => {
       const chainId = await ethers.provider
         .getNetwork()
         .then((n) => Number(n.chainId));
-      const customChainId = chainId & 0xffff;
+      const maskedChainId = chainId & 0xffff;
 
       const domain = {
         name: "Wallet",
         version: "1",
-        chainId: customChainId,
+        chainId: maskedChainId,
         verifyingContract: await smartAccount.getAddress(),
       };
 
@@ -1225,12 +1225,12 @@ describe("SimpleAccount", () => {
       const chainId = await ethers.provider
         .getNetwork()
         .then((n) => Number(n.chainId));
-      const customChainId = chainId & 0xffff;
+      const maskedChainId = chainId & 0xffff;
 
       const domain = {
         name: "Wallet",
         version: "1",
-        chainId: customChainId,
+        chainId: maskedChainId,
         verifyingContract: await smartAccount.getAddress(),
       };
 
@@ -1276,12 +1276,12 @@ describe("SimpleAccount", () => {
       const chainId = await ethers.provider
         .getNetwork()
         .then((n) => Number(n.chainId));
-      const customChainId = chainId & 0xffff;
+      const maskedChainId = chainId & 0xffff;
 
       const domain = {
         name: "Wallet",
         version: "1",
-        chainId: customChainId,
+        chainId: maskedChainId,
         verifyingContract: await smartAccount.getAddress(),
       };
 

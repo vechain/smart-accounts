@@ -27,7 +27,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * - Added executeBatchWithAuthorization() method, so multiple clauses can be signed at once.
  * - Using nonces in new executeBatchWithAuthorization() method to prevent replay attacks (executeWithAuthorization() remains without nonces for backwards compatibility).
  * - version() returns an integer, instead of a string.
- * - Added customChainId() method that parses the chainId to 16 bits to avoid issues with iOS and Android programming languages.
+ * - Added maskedChainId() method that parses the chainId to 16 bits to avoid issues with iOS and Android programming languages.
  * - Added executeBatchWithCustomAuthorization() method that uses a custom EIP-712 domain separator for iOS and Android compatibility.
  */
 contract SimpleAccount is
@@ -514,7 +514,7 @@ contract SimpleAccount is
             hex"0f", // 01111 (same as standard EIP712 - represents which fields are present)
             "Wallet",
             "1",
-            customChainId(),
+            maskedChainId(),
             address(this),
             bytes32(0),
             new uint256[](0)
@@ -532,7 +532,7 @@ contract SimpleAccount is
      * This is done to solve a compatibility issue for apps built with Swift programming language when
      * signing typed data with the standard EIP-712 domain separator.
      */
-    function customChainId() public view returns (uint256) {
+    function maskedChainId() public view returns (uint256) {
         return block.chainid & 0xFFFF;
     }
 
