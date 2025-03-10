@@ -3,7 +3,7 @@ const config: AppConfig = {
   environment: "testnet",
   basePath: "https://example.org",
   simpleAccountFactoryContractAddress:
-    "0x7EABA81B4F3741Ac381af7e025f3B6e0428F05Fb",
+    "0x713b908Bcf77f3E00EFEf328E50b657a1A23AeaF",
   nodeUrl: "https://testnet.vechain.org",
   network: {
     id: "testnet",

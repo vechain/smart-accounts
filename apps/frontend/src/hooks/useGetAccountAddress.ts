@@ -50,6 +50,6 @@ export const useGetAccountAddress = (address: string, env: EnvConfig) => {
   return useQuery({
     queryKey: getAccountAddressQueryKey(address, env),
     queryFn: async () => getAccountAddress(thor, address, env),
-    enabled: !!thor,
+    enabled: !!thor && !!address && !!env,
   });
 };

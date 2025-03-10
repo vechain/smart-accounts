@@ -980,4 +980,351 @@ describe("SimpleAccount", () => {
       );
     });
   });
+
+  describe("Custom Authorization", () => {
+    it("should execute batch with custom domain separator", async () => {
+      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      // Setup test transactions
+      const transactions = [
+        {
+          to: await otherAccounts[0].getAddress(),
+          value: ethers.parseEther("0"),
+          data: ethers.hexlify(ethers.toUtf8Bytes("test1")),
+        },
+        {
+          to: await otherAccounts[1].getAddress(),
+          value: ethers.parseEther("0"),
+          data: ethers.hexlify(ethers.toUtf8Bytes("test2")),
+        },
+      ];
+
+      const chainId = await ethers.provider
+        .getNetwork()
+        .then((n) => Number(n.chainId));
+      const maskedChainId = chainId & 0xffff; // Apply the mask as done in the contract
+
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: Number(maskedChainId),
+        verifyingContract: await smartAccount.getAddress(),
+      };
+
+      const types = {
+        ExecuteBatchWithAuthorization: [
+          { name: "to", type: "address[]" },
+          { name: "value", type: "uint256[]" },
+          { name: "data", type: "bytes[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      };
+
+      const message = {
+        to: transactions.map((t) => t.to),
+        value: transactions.map((t) => t.value),
+        data: transactions.map((t) => t.data),
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+        nonce: ethers.randomBytes(32),
+      };
+
+      const signature = await deployer.signTypedData(domain, types, message);
+
+      // Execute the batch
+      await expect(
+        smartAccount.executeBatchWithCustomAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          message.nonce,
+          signature
+        )
+      ).to.not.be.reverted;
+    });
+
+    it("should fail with mismatched array lengths", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const nonce = ethers.randomBytes(32);
+      const validAfter = 0;
+      const validBefore = Math.floor(Date.now() / 1000) + 3600;
+
+      await expect(
+        smartAccount.executeBatchWithCustomAuthorization(
+          [ethers.ZeroAddress],
+          [],
+          ["0x"],
+          validAfter,
+          validBefore,
+          nonce,
+          "0x"
+        )
+      ).to.be.revertedWith("Array lengths mismatch");
+    });
+
+    it("should not allow reuse of nonce", async () => {
+      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const transactions = [
+        {
+          to: await otherAccounts[0].getAddress(),
+          value: ethers.parseEther("0"),
+          data: ethers.hexlify(ethers.toUtf8Bytes("test")),
+        },
+      ];
+
+      const chainId = await ethers.provider
+        .getNetwork()
+        .then((n) => Number(n.chainId));
+      const maskedChainId = chainId & 0xffff;
+
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: Number(maskedChainId),
+        verifyingContract: await smartAccount.getAddress(),
+      };
+
+      const types = {
+        ExecuteBatchWithAuthorization: [
+          { name: "to", type: "address[]" },
+          { name: "value", type: "uint256[]" },
+          { name: "data", type: "bytes[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      };
+
+      const message = {
+        to: transactions.map((t) => t.to),
+        value: transactions.map((t) => t.value),
+        data: transactions.map((t) => t.data),
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 3600,
+        nonce: ethers.randomBytes(32),
+      };
+
+      const signature = await deployer.signTypedData(domain, types, message);
+
+      // First execution should succeed
+      await smartAccount.executeBatchWithCustomAuthorization(
+        message.to,
+        message.value,
+        message.data,
+        message.validAfter,
+        message.validBefore,
+        message.nonce,
+        signature
+      );
+
+      // Second execution with same nonce should fail
+      await expect(
+        smartAccount.executeBatchWithCustomAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          message.nonce,
+          signature
+        )
+      ).to.be.revertedWith("Nonce already used, please sign a new transaction");
+    });
+
+    it("should verify custom domain separator parameters", async () => {
+      const { deployer } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const [
+        fields,
+        name,
+        version,
+        chainId,
+        verifyingContract,
+        salt,
+        extensions,
+      ] = await smartAccount.customEip712Domain();
+
+      expect(fields).to.equal("0x0f");
+      expect(name).to.equal("Wallet");
+      expect(version).to.equal("1");
+      expect(verifyingContract).to.equal(await smartAccount.getAddress());
+      expect(salt).to.equal(ethers.ZeroHash);
+      expect(extensions.length).to.equal(0);
+
+      const expectedChainId =
+        (await ethers.provider.getNetwork().then((n) => Number(n.chainId))) &
+        0xffff;
+      expect(chainId).to.equal(expectedChainId);
+    });
+
+    it("should fail if authorization is not yet valid", async () => {
+      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const chainId = await ethers.provider
+        .getNetwork()
+        .then((n) => Number(n.chainId));
+      const maskedChainId = chainId & 0xffff;
+
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: maskedChainId,
+        verifyingContract: await smartAccount.getAddress(),
+      };
+
+      const types = {
+        ExecuteBatchWithAuthorization: [
+          { name: "to", type: "address[]" },
+          { name: "value", type: "uint256[]" },
+          { name: "data", type: "bytes[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      };
+
+      const message = {
+        to: [await otherAccounts[0].getAddress()],
+        value: [ethers.parseEther("0")],
+        data: ["0x"],
+        validAfter: Math.floor(Date.now() / 1000) + 3600, // 1 hour in the future
+        validBefore: Math.floor(Date.now() / 1000) + 7200, // 2 hours in the future
+        nonce: ethers.randomBytes(32),
+      };
+
+      const signature = await deployer.signTypedData(domain, types, message);
+
+      await expect(
+        smartAccount.executeBatchWithCustomAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          message.nonce,
+          signature
+        )
+      ).to.be.revertedWith("Authorization not yet valid");
+    });
+
+    it("should fail if authorization has expired", async () => {
+      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const chainId = await ethers.provider
+        .getNetwork()
+        .then((n) => Number(n.chainId));
+      const maskedChainId = chainId & 0xffff;
+
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: maskedChainId,
+        verifyingContract: await smartAccount.getAddress(),
+      };
+
+      const types = {
+        ExecuteBatchWithAuthorization: [
+          { name: "to", type: "address[]" },
+          { name: "value", type: "uint256[]" },
+          { name: "data", type: "bytes[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      };
+
+      const message = {
+        to: [await otherAccounts[0].getAddress()],
+        value: [ethers.parseEther("0")],
+        data: ["0x"],
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) - 3600, // 1 hour in the past
+        nonce: ethers.randomBytes(32),
+      };
+
+      const signature = await deployer.signTypedData(domain, types, message);
+
+      await expect(
+        smartAccount.executeBatchWithCustomAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          message.nonce,
+          signature
+        )
+      ).to.be.revertedWith("Authorization expired");
+    });
+
+    it("should fail with invalid signer and show correct error message", async () => {
+      const { deployer, otherAccounts } = await getOrDeployContracts(true);
+      const { smartAccount } = await createSmartAccountThroughFactory(deployer);
+
+      const chainId = await ethers.provider
+        .getNetwork()
+        .then((n) => Number(n.chainId));
+      const maskedChainId = chainId & 0xffff;
+
+      const domain = {
+        name: "Wallet",
+        version: "1",
+        chainId: maskedChainId,
+        verifyingContract: await smartAccount.getAddress(),
+      };
+
+      const types = {
+        ExecuteBatchWithAuthorization: [
+          { name: "to", type: "address[]" },
+          { name: "value", type: "uint256[]" },
+          { name: "data", type: "bytes[]" },
+          { name: "validAfter", type: "uint256" },
+          { name: "validBefore", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+        ],
+      };
+
+      const message = {
+        to: [await otherAccounts[0].getAddress()],
+        value: [ethers.parseEther("0")],
+        data: ["0x"],
+        validAfter: 0,
+        validBefore: Math.floor(Date.now() / 1000) + 3600,
+        nonce: ethers.randomBytes(32),
+      };
+
+      // Sign with a non-owner account
+      const nonOwner = otherAccounts[0];
+      const signature = await nonOwner.signTypedData(domain, types, message);
+
+      const expectedOwner = await deployer.getAddress();
+      const actualSigner = await nonOwner.getAddress();
+
+      await expect(
+        smartAccount.executeBatchWithCustomAuthorization(
+          message.to,
+          message.value,
+          message.data,
+          message.validAfter,
+          message.validBefore,
+          message.nonce,
+          signature
+        )
+      ).to.be.revertedWith(
+        `Invalid signer. Expected: ${expectedOwner.toLowerCase()} Got: ${actualSigner.toLowerCase()}`
+      );
+    });
+  });
 });

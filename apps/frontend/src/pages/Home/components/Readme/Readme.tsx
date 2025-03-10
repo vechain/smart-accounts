@@ -106,22 +106,22 @@ export const Readme = () => {
           <Text>
             When using executeBatchWithAuthorization, proper nonce management is
             crucial to protect users against replay attacks:
-            <List ml={5} mt={2} spacing={2} styleType="circle">
-              <ListItem>
-                Generate the nonce when requesting the signature (recommended to
-                use Date.now())
-              </ListItem>
-              <ListItem>Each nonce can only be used once per account</ListItem>
-              <ListItem>
-                Without proper nonce management, signed transactions could be
-                replayed multiple times by malicious actors
-              </ListItem>
-              <ListItem>
-                Nonces are only required and validated for the
-                executeBatchWithAuthorization method
-              </ListItem>
-            </List>
           </Text>
+          <List ml={5} mt={2} spacing={2} styleType="circle">
+            <ListItem>
+              Generate the nonce when requesting the signature (recommended to
+              use Date.now())
+            </ListItem>
+            <ListItem>Each nonce can only be used once per account</ListItem>
+            <ListItem>
+              Without proper nonce management, signed transactions could be
+              replayed multiple times by malicious actors
+            </ListItem>
+            <ListItem>
+              Nonces are only required and validated for the
+              executeBatchWithAuthorization method
+            </ListItem>
+          </List>
 
           <Text>
             You can fork the contracts and deploy them on your own, but we
@@ -177,17 +177,27 @@ export const Readme = () => {
 
           <Divider />
 
-          <Text>
-            The contracts are deployed on the following networks:
-            <List spacing={3} styleType="disc">
-              <ListItem>
-                <b>Mainnet</b>: 0xC06Ad8573022e2BE416CA89DA47E8c592971679A
-              </ListItem>
-              <ListItem>
-                <b>Testnet</b>: 0x7EABA81B4F3741Ac381af7e025f3B6e0428F05Fb
-              </ListItem>
-            </List>
-          </Text>
+          <Text>The contracts are deployed on the following networks:</Text>
+          <VStack align="stretch" spacing={4}>
+            <Text>
+              <b>Mainnet</b>:{" "}
+              <Link
+                isExternal
+                href="https://vechainstats.com/account/0xc06ad8573022e2be416ca89da47e8c592971679a/"
+              >
+                0xC06Ad8573022e2BE416CA89DA47E8c592971679A
+              </Link>
+            </Text>
+            <Text>
+              <b>Testnet</b>:{" "}
+              <Link
+                isExternal
+                href="https://explore-testnet.vechain.org/accounts/0x713b908Bcf77f3E00EFEf328E50b657a1A23AeaF"
+              >
+                0x713b908Bcf77f3E00EFEf328E50b657a1A23AeaF
+              </Link>
+            </Text>
+          </VStack>
 
           <Text>
             For detailed documentation and implementation details, check out the{" "}

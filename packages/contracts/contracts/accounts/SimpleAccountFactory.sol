@@ -31,7 +31,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * - version() returns an integer, instead of a string.
  * - Fixed: createAccountWithSalt() method was using the getAccountAddress() method instead of getAccountAddressWithSalt()
  * - Fixed: emit AccountCreated after the account is created, so the address is not 0
- * - Added hasLegacyAccount() method to check if an owner has a legacy account
+ * - Added helper getters: hasLegacyAccount(), upgradeRequired(), upgradeRequiredForAccount()
+ * - Added createAccountWithVersion() method to create an account with a specific version (to be used for testing purposes during the upgrade).
  *
  * WARNING
  * Having a V3 of SimpleAccount means that the implementation address inside the factory changes, which causes the
@@ -257,6 +258,67 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         emit AccountCreated(createdAccount, owner, salt);
     }
 
+    /**
+     * @dev Create an account with a specific implementation version, and return its address.
+     * Returns the address even if the account is already deployed.
+     *
+     * @notice Warning: use this only for testing purposes.
+     *
+     * @param owner The owner of the account
+     * @param _version The implementation version to use (1 or 3)
+     * @return createdAccount The created account
+     */
+    function createAccountWithVersion(
+        address owner,
+        uint256 _version
+    )
+        public
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        returns (SimpleAccount createdAccount)
+    {
+        require(
+            _version == 1 || _version == 3,
+            "Only versions 1 and 3 are supported"
+        );
+
+        uint256 salt = uint256(uint160(owner));
+
+        // Calculate address with the specified implementation
+        address implementation = _version == 1
+            ? address(accountImplementationV1)
+            : address(accountImplementationV3);
+
+        address accountAddress = Create2.computeAddress(
+            bytes32(salt),
+            keccak256(
+                abi.encodePacked(
+                    type(ERC1967Proxy).creationCode,
+                    abi.encode(
+                        implementation,
+                        abi.encodeCall(SimpleAccount.initialize, (owner))
+                    )
+                )
+            )
+        );
+
+        // Check if account already exists
+        if (accountAddress.code.length > 0) {
+            return SimpleAccount(payable(accountAddress));
+        }
+
+        // Deploy with specified implementation
+        createdAccount = SimpleAccount(
+            payable(
+                new ERC1967Proxy{salt: bytes32(salt)}(
+                    implementation,
+                    abi.encodeCall(SimpleAccount.initialize, (owner))
+                )
+            )
+        );
+
+        emit AccountCreated(createdAccount, owner, salt);
+    }
+
     // ---------- Getters ---------- //
 
     /**
@@ -395,6 +457,54 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     }
 
     /**
+     * @dev A helper function that calculates the version of an account (even if it is not deployed yet)
+     * @notice Since it is needed to mantain backwards compatibility with V1 accounts, this should
+     * be used to know what version an account is when it is not deployed yet.
+     * @notice This function is intended for accounts generated without custom salt.
+     *
+     * @param account The address of the account
+     * @param owner The owner of the account
+     * @return accountVersion The version of the account
+     * @return isDeployed True if the account is deployed, false otherwise
+     */
+    function getAccountVersion(
+        address account,
+        address owner
+    ) public view returns (uint256 accountVersion, bool isDeployed) {
+        address calculatedAddress = getAccountAddress(owner);
+        require(
+            calculatedAddress == account,
+            "Account address does not match calculated address of owner"
+        );
+
+        // check if the account is deployed
+        isDeployed = account.code.length > 0;
+
+        // if it is not deployed, check if it is legacy
+        if (!isDeployed) {
+            bool isLegacy = hasLegacyAccount(owner);
+
+            if (isLegacy) {
+                accountVersion = 1;
+            } else {
+                accountVersion = currentAccountImplementationVersion();
+            }
+            return (accountVersion, isDeployed);
+        }
+
+        // if it is deployed, let's call the version() method of the account
+        try SimpleAccount(payable(account)).version() returns (
+            uint256 _accountVersion
+        ) {
+            accountVersion = _accountVersion;
+        } catch {
+            // if it reverts, it means it is a V1 account, because V1 accounts do not have the version() method
+            accountVersion = 1;
+        }
+        return (accountVersion, isDeployed);
+    }
+
+    /**
      * @dev Get the current version of the account implementation
      * @return The current version of the account implementation
      */
@@ -420,15 +530,27 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
     }
 
     /**
-     * @dev Check if an account needs to be upgraded to a specific version
+     * @dev Check if an account needs to be upgraded to a specific version. Similar to
+     * @notice Only works for already deployed accounts
+     * @notice Does not work for accounts generated through custom salt
+     *
      * @param accountAddress The address to check
      * @param targetVersion The version to check against
      * @return True if the account needs to be upgraded to the target version, false otherwise
      */
-    function accountNeedsUpgradeToVersion(
+    function upgradeRequiredForAccount(
         address accountAddress,
         uint256 targetVersion
     ) public view returns (bool) {
+        if (targetVersion == 0) {
+            targetVersion = currentAccountImplementationVersion();
+        } else {
+            require(
+                targetVersion <= currentAccountImplementationVersion(),
+                "Target version must be less than or equal to the current version"
+            );
+        }
+
         if (accountAddress.code.length == 0) {
             return false; // Not deployed yet, no upgrade needed
         }
@@ -449,5 +571,44 @@ contract SimpleAccountFactory is UUPSUpgradeable, AccessControlUpgradeable {
         } catch {
             return true; // V1 accounts will fail version check, so they need upgrade
         }
+    }
+
+    /**
+     * @dev A helper to check if an account needs to be upgraded to a specific version
+     * @notice This function is NOT intended to be used for accounts generated with custom salt.
+     * @notice This function will return TRUE for not deployed accounts, use
+     *
+     * @param account The address of the account
+     * @param owner The owner of the account
+     * @param targetVersion The version to check against, if 0 then it will check against the latest version
+     * @return True if the account needs to be upgraded to the target version, false otherwise
+     */
+    function upgradeRequired(
+        address account,
+        address owner,
+        uint256 targetVersion
+    ) public view returns (bool) {
+        if (targetVersion == 0) {
+            targetVersion = currentAccountImplementationVersion();
+        } else {
+            require(
+                targetVersion <= currentAccountImplementationVersion(),
+                "Target version must be less than or equal to the current version"
+            );
+        }
+
+        address calculatedAddress = getAccountAddress(owner);
+        require(
+            calculatedAddress == account,
+            "Account address does not match calculated address of owner"
+        );
+
+        // If the account is not deployed
+        if (account.code.length == 0) {
+            // legacy accounts need to be upgraded
+            return hasLegacyAccount(owner);
+        }
+
+        return upgradeRequiredForAccount(account, targetVersion);
     }
 }

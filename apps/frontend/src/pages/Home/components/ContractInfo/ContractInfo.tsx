@@ -4,13 +4,19 @@ import {
   CardHeader,
   HStack,
   Heading,
+  IconButton,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { AddressButtonGhostVariant } from "../../../../components";
-import { useAccountCreatedEvents } from "../../../../hooks";
+import {
+  getAccountCreatedEventsQueryKey,
+  useAccountCreatedEvents,
+} from "../../../../hooks";
 import { EnvConfig } from "@repo/config/contracts";
 import { useContractVersion } from "../../../../hooks/useContractVersion";
+import { FaSync } from "react-icons/fa";
+import { useQueryClient } from "@tanstack/react-query";
 
 type ContractAddressAndBalanceCardProps = {
   title: string;
@@ -23,6 +29,7 @@ export const ContractInfo = ({
   address,
   env,
 }: ContractAddressAndBalanceCardProps) => {
+  const queryClient = useQueryClient();
   const { data: contractVersion } = useContractVersion(address, env);
 
   const { data: accountsCreatedEvents, isLoading: isLoadingCreatedAccoounts } =
@@ -51,13 +58,30 @@ export const ContractInfo = ({
           </HStack>
 
           <HStack w="full" justify={"space-between"}>
-            <Text fontSize="md" fontWeight={600}>
-              Accounts created
-            </Text>
+            <HStack>
+              <Text fontSize="md" fontWeight={600}>
+                Accounts created
+              </Text>
+              <IconButton
+                aria-label="Refresh"
+                icon={<FaSync />}
+                size={"sm"}
+                variant={"ghost"}
+                isLoading={isLoadingCreatedAccoounts}
+                onClick={async () => {
+                  await queryClient.invalidateQueries({
+                    queryKey: getAccountCreatedEventsQueryKey(env),
+                  });
+                  await queryClient.refetchQueries({
+                    queryKey: getAccountCreatedEventsQueryKey(env),
+                  });
+                }}
+              />
+            </HStack>
             <Text fontSize="md" fontWeight={600}>
               {isLoadingCreatedAccoounts
                 ? "Loading..."
-                : accountsCreatedEvents?.created.length}
+                : accountsCreatedEvents?.totalCreated}
             </Text>
           </HStack>
         </VStack>

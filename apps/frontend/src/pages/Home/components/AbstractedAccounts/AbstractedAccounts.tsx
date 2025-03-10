@@ -53,12 +53,12 @@ export const AbstractedAccounts = () => {
             >
               <UserAccount
                 env="mainnet"
-                account={connectedWallet?.address ?? ""}
+                ownerAddress={connectedWallet?.address ?? ""}
                 showDeployButton={true}
               />
               <UserAccount
                 env="testnet"
-                account={connectedWallet?.address ?? ""}
+                ownerAddress={connectedWallet?.address ?? ""}
                 showDeployButton={false}
               />
             </Stack>
