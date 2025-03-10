@@ -32,8 +32,18 @@ export const ContractInfo = ({
   const queryClient = useQueryClient();
   const { data: contractVersion } = useContractVersion(address, env);
 
-  const { data: accountsCreatedEvents, isLoading: isLoadingCreatedAccoounts } =
-    useAccountCreatedEvents(env);
+  const {
+    data: accountsCreatedEvents,
+    isLoading: isLoadingCreatedAccoounts,
+    isFetching: isFetchingCreatedAccoounts,
+    isFetchedAfterMount: isFetchedAfterMountCreatedAccoounts,
+    dataUpdatedAt,
+  } = useAccountCreatedEvents(env);
+
+  const isLoading =
+    isLoadingCreatedAccoounts ||
+    isFetchingCreatedAccoounts ||
+    !isFetchedAfterMountCreatedAccoounts;
 
   return (
     <Card w="full" p={2}>
@@ -67,7 +77,7 @@ export const ContractInfo = ({
                 icon={<FaSync />}
                 size={"sm"}
                 variant={"ghost"}
-                isLoading={isLoadingCreatedAccoounts}
+                isLoading={isLoading}
                 onClick={async () => {
                   await queryClient.invalidateQueries({
                     queryKey: getAccountCreatedEventsQueryKey(env),
@@ -84,6 +94,10 @@ export const ContractInfo = ({
                 : accountsCreatedEvents?.totalCreated}
             </Text>
           </HStack>
+          <Text fontSize="xs" color="gray.500" w="full">
+            Last updated:{" "}
+            {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleString() : "-"}
+          </Text>
         </VStack>
       </CardBody>
     </Card>
