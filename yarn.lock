@@ -4037,10 +4037,10 @@
     "@openzeppelin/contracts-upgradeable" "5.0.2"
     ethers "^6.9.0"
 
-"@vechain/vechain-kit@1.5.0":
-  version "1.5.0"
-  resolved "https://registry.yarnpkg.com/@vechain/vechain-kit/-/vechain-kit-1.5.0.tgz#8587f3a8df8c4e20853c029abf80e0a7a15b356a"
-  integrity sha512-wnr6OqeiA9u7PjoRRymF3PBSw1+Wys/fWMqLWxrXnJ9o0se34KPUmRJ1hVzy2ArlHy/MZZvStEQDhmBsR9KkSA==
+"@vechain/vechain-kit@1.5.1":
+  version "1.5.1"
+  resolved "https://registry.yarnpkg.com/@vechain/vechain-kit/-/vechain-kit-1.5.1.tgz#c014f3fdcad4564421eff014a0d72562a73db9f6"
+  integrity sha512-2wcNYgcmCXKUShKJa4UPlNeV4cJmwE2pEcI3+x2SN7YP/CX1keCp4SS1tstlEzDDoHMS7vPMSsueOpCiF6VRbg==
   dependencies:
     "@chakra-ui/react" "^2.8.2"
     "@choc-ui/chakra-autocomplete" "^5.3.0"
