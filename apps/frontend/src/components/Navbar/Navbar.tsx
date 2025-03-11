@@ -17,7 +17,7 @@ export const Navbar = () => {
         </HStack>
 
         <HStack spacing={4}>
-          <WalletButton mobileVariant="icon" />
+          <WalletButton mobileVariant="icon" connectionVariant="popover" />
         </HStack>
       </HStack>
     </Stack>

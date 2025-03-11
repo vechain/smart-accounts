@@ -30,6 +30,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           network={{
             type: "main",
           }}
+          loginMethods={[
+            { method: "vechain", gridColumn: 4 },
+            { method: "dappkit", gridColumn: 4 },
+            { method: "ecosystem", gridColumn: 4 },
+          ]}
         >
           <App />
         </VeChainKitProvider>
