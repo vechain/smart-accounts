@@ -69,14 +69,7 @@ export const Readme = () => {
                   messages
                 </ListItem>
                 <ListItem>Handle both single and batch transactions</ListItem>
-                <ListItem>Be upgraded by the owner</ListItem>
                 <ListItem>Transfer ownership to another address</ListItem>
-                <ListItem>
-                  Use time-based validity windows for transactions
-                </ListItem>
-                <ListItem>
-                  Prevent replay attacks using nonces for batch transactions
-                </ListItem>
               </List>
             </ListItem>
             <ListItem>
@@ -88,46 +81,18 @@ export const Readme = () => {
                   CREATE2
                 </ListItem>
                 <ListItem>
+                  Get the account address of a smart account without deploying
+                  it
+                </ListItem>
+                <ListItem>
                   Supports multiple accounts per owner through custom salts
                 </ListItem>
                 <ListItem>
                   Manages different versions of the SimpleAccount implementation
                 </ListItem>
-                <ListItem>
-                  Maintains compatibility with legacy accounts
-                </ListItem>
               </List>
             </ListItem>
           </List>
-
-          <Text fontWeight="medium" mt={4}>
-            Important Note about Nonces:
-          </Text>
-          <Text>
-            When using executeBatchWithAuthorization, proper nonce management is
-            crucial to protect users against replay attacks:
-          </Text>
-          <List ml={5} mt={2} spacing={2} styleType="circle">
-            <ListItem>
-              Generate the nonce when requesting the signature (recommended to
-              use Date.now())
-            </ListItem>
-            <ListItem>Each nonce can only be used once per account</ListItem>
-            <ListItem>
-              Without proper nonce management, signed transactions could be
-              replayed multiple times by malicious actors
-            </ListItem>
-            <ListItem>
-              Nonces are only required and validated for the
-              executeBatchWithAuthorization method
-            </ListItem>
-          </List>
-
-          <Text>
-            You can fork the contracts and deploy them on your own, but we
-            recommend using the contracts deployed by us for a better cross-app
-            compatibility.
-          </Text>
 
           <Divider />
 
@@ -146,7 +111,7 @@ export const Readme = () => {
                   execution
                 </ListItem>
                 <ListItem>
-                  V2: Skipped for misconfiguration during upgrade
+                  V2: <i>Skipped for misconfiguration during upgrade</i>
                 </ListItem>
                 <ListItem>
                   V3: Introduced batch transactions with nonce-based replay

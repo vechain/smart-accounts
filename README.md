@@ -46,11 +46,11 @@ There are 2 contracts that work together to enable social login and account abst
 
 - **SimpleAccountFactory**: Factory contract that creates and manages SimpleAccount contracts:
   - Creates new accounts with deterministic addresses using CREATE2
+  - Get the account address of a smart account without deploying it
   - Supports multiple accounts per owner through custom salts
   - Manages different versions of the SimpleAccount implementation
-  - Maintains compatibility with legacy accounts
 
-### Transaction Flow
+### How to use the smart accounts
 
 1. **Account Creation**: When a user wants to create a smart account, they interact with the SimpleAccountFactory, which creates a new SimpleAccount instance with the user as the owner.
 
