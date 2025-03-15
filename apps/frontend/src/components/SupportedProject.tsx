@@ -31,7 +31,7 @@ export const SupportedProject = () => {
     },
     {
       href: "https://www.vechain.org",
-      logo: "https://imagedelivery.net/oHBRUd2clqykxgDWmeAyLg/661dd77c-2f9d-40e7-baa1-f4e24fd7bf00/icon",
+      logo: "https://vechain.org/wp-content/uploads/2025/02/VeChain_Icon_Quartz_300ppi.png",
       name: "VeChain",
     },
   ];
