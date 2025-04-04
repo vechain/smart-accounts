@@ -26,7 +26,7 @@ export const SupportedProject = () => {
     { href: "https://evearn.io", logo: EVEarnLogo, name: "EVEarn" },
     {
       href: "https://greencart.ai",
-      logo: "https://play-lh.googleusercontent.com/SezsjuPjwTJoM5XDRhVu6Hhzb2VGdNQuQ43SmBv2lsRuzxJWZnanvDvY4b3l3HTGJ1U=w240-h480-rw",
+      logo: "https://www.greencart.ai/logo/greencart_favicon_colored.png",
       name: "GreenCart",
     },
     {

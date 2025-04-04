@@ -1,24 +1,16 @@
-import {
-  VECHAIN_URL_SOLO,
-  VECHAIN_URL_MAINNET,
-  VECHAIN_URL_TESTNET,
-} from "@vechain/hardhat-vechain";
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomiclabs/hardhat-truffle5";
-import "@vechain/hardhat-vechain";
-import "@vechain/hardhat-ethers";
+import "@vechain/sdk-hardhat-plugin";
 import "hardhat-contract-sizer";
 import "hardhat-ignore-warnings";
 import { getConfig } from "@repo/config";
 import "solidity-coverage";
 import "solidity-docgen";
 import { EnvConfig } from "@repo/config/contracts";
+import "@nomicfoundation/hardhat-verify";
 
-const config: HardhatUserConfig = {
-  solidity: "0.8.20",
-};
-
+const VECHAIN_DERIVATION_PATH = "m/44'/818'/0'/0";
 const getEnvMnemonic = () => {
   const mnemonic = process.env.MNEMONIC;
 
@@ -28,20 +20,24 @@ const getEnvMnemonic = () => {
 const getSoloUrl = () => {
   const url = process.env.VITE_APP_ENV
     ? getConfig(process.env.VITE_APP_ENV as EnvConfig).network.urls[0]
-    : VECHAIN_URL_SOLO;
+    : "http://localhost:8669";
   return url;
 };
 
-module.exports = {
+const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.20",
-    evmVersion: "paris",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 1,
+    compilers: [
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1,
+          },
+          evmVersion: "paris",
+        },
       },
-    },
+    ],
   },
   contractSizer: {
     alphaSort: true,
@@ -52,50 +48,51 @@ module.exports = {
   mocha: {
     timeout: 1800000,
   },
-  defaultNetwork: process.env.IS_TEST_COVERAGE ? "hardhat" : "vechain_solo",
+  gasReporter: {
+    enabled: false,
+  },
+  defaultNetwork: "hardhat",
   networks: {
     hardhat: {
       chainId: 1337,
-      accounts: {
-        count: 30,
-      },
     },
     vechain_solo: {
       url: getSoloUrl(),
       accounts: {
         mnemonic: getEnvMnemonic(),
         count: 20,
-        path: "m/44'/818'/0'/0",
+        path: VECHAIN_DERIVATION_PATH,
       },
-      restful: true,
       gas: 10000000,
     },
     vechain_testnet: {
-      url: VECHAIN_URL_TESTNET,
+      url: "https://testnet.vechain.org",
+      chainId: 100010,
       accounts: {
         mnemonic: getEnvMnemonic(),
         count: 20,
-        path: "m/44'/818'/0'/0",
+        path: VECHAIN_DERIVATION_PATH,
       },
-      restful: true,
       gas: 10000000,
     },
     vechain_mainnet: {
-      url: VECHAIN_URL_MAINNET,
+      url: "https://mainnet.vechain.org",
+      chainId: 100009,
       accounts: {
         mnemonic: getEnvMnemonic(),
         count: 20,
-        path: "m/44'/818'/0'/0",
+        path: VECHAIN_DERIVATION_PATH,
       },
-      restful: true,
       gas: 10000000,
     },
   },
   docgen: {
     pages: "files",
-    exclude: ["core", "deprecated", "interfaces", "mocks", "utils"],
-    clear: true,
-    runOnCompile: true,
+  },
+  sourcify: {
+    enabled: true,
+    apiUrl: "https://sourcify.dev/server",
+    browserUrl: "https://repo.sourcify.dev",
   },
 };
 
