@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_DELEGATOR_URL: ${{ secrets.VITE_DELEGATOR_URL }}
+      MNEMONIC: ${{ secrets.MNEMONIC }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
