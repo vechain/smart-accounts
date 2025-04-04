@@ -4,6 +4,21 @@
   "globalDependencies": ["**/.env.*local"],
   "globalEnv": ["VITE_APP_ENV", "MNEMONIC", "VITE_DELEGATOR_URL"],
   "pipeline": {
+    "build": {
+      "dependsOn": ["^compile", "@repo/config#check-or-generate-local-config"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "build:prod": {
+      "cache": false,
+      "dependsOn": [
+        "^compile",
+        "@repo/contracts#check-contracts-deployment:mainnet"
+      ],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
     "compile": {
       "cache": false,
       "dependsOn": ["@repo/config#check-or-generate-local-config"]
