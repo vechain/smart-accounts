@@ -10,10 +10,7 @@
     },
     "build:prod": {
       "cache": false,
-      "dependsOn": [
-        "^compile",
-        "@repo/contracts#check-contracts-deployment:mainnet"
-      ],
+      "dependsOn": ["^compile", "@repo/config#check-or-generate-local-config"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "lint": {
