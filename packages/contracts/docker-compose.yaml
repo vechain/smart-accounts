@@ -1,6 +1,6 @@
 services:
   thor-solo:
-    image: vechain/thor:v2.1.2
+    image: ghcr.io/vechain/thor:release-galactica-latest
     hostname: thor-solo
     container_name: thor-solo
     user: root
@@ -15,7 +15,7 @@ services:
     ports:
       - "8669:8669"
     healthcheck:
-      test: curl --fail 0.0.0.0:8669/blocks/0 || exit 1
+      test: curl --fail 0.0.0.0:8669/blocks/1 || exit 1
       interval: "2s"
       retries: 30
     volumes:
@@ -23,20 +23,35 @@ services:
     networks:
       - vechain-thor
 
-  # insight:
-  #   image: thor-insights
-  #   hostname: insight
-  #   container_name: insight
-  #   environment:
-  #     - VUE_APP_SOLO_URL=http://localhost:8669
-  #   ports:
-  #     - "8181:80"
-  #   networks:
-  #     - vechain-thor
+  insight:
+    image: ghcr.io/vechain/insight-app:master
+    platform: linux/amd64
+    hostname: insight
+    container_name: insight
+    environment:
+      - VUE_APP_SOLO_URL=http://localhost:8669
+    ports:
+      - "8080:80"
+    networks:
+      - vechain-thor
+
+  inspector:
+    image: ghcr.io/vechain/inspector-app:master
+    platform: linux/amd64
+    hostname: inspector
+    container_name: inspector
+    environment:
+      - VUE_APP_SOLO_URL=http://localhost:8669
+    ports:
+      - "8081:80"
+    networks:
+      - vechain-thor
+
 networks:
   vechain-thor:
     driver: bridge
     name: vechain-thor
+
 volumes:
   thor-data:
     driver: local

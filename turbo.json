@@ -135,7 +135,8 @@
       "dependsOn": ["^@repo/config#check-or-generate-local-config"]
     },
     "test:thor-solo": {
-      "cache": false
+      "cache": false,
+      "dependsOn": ["^compile", "@repo/config#check-or-generate-local-config"]
     },
     "test:hardhat": {
       "cache": false,
