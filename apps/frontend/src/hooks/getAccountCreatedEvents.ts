@@ -1,9 +1,8 @@
-import { abi } from "thor-devkit";
 import { getConfig } from "@repo/config";
-import { SimpleAccountFactoryJson } from "@repo/contracts";
-import { getAllEvents } from "./getEvents";
+import { SimpleAccountFactory__factory } from "@repo/contracts";
 import { EnvConfig } from "@repo/config/contracts";
-const simpleAccountFactoryAbi = SimpleAccountFactoryJson.abi;
+import { getAllEventLogs, ThorClient } from "@vechain/vechain-kit";
+import { FilterCriteria } from "@vechain/sdk-network";
 
 export type AccountCreatedEvent = {
   address: string;
@@ -19,36 +18,46 @@ const MAINNET_SNAPSHOT_BLOCK = 21086312;
 const MAINNET_CREATED_ACCOUNTS_COUNT_AT_SNAPSHOT = 135243;
 
 export const getAccountsCreatedEvents = async (
-  thor: Connex.Thor,
+  thor: ThorClient,
   env: EnvConfig
 ) => {
   const simpleAccountFactoryContractAddress =
     getConfig(env).simpleAccountFactoryContractAddress;
 
-  const accountCreatedAbi = simpleAccountFactoryAbi.find(
-    (abi) => abi.name === "AccountCreated"
-  );
-  if (!accountCreatedAbi) throw new Error("AccountCreated event not found");
-  const accountCreatedEvent = new abi.Event(
-    accountCreatedAbi as unknown as abi.Event.Definition
-  );
+  const eventAbi = thor.contracts
+    .load(
+      simpleAccountFactoryContractAddress,
+      SimpleAccountFactory__factory.abi
+    )
+    .getEventAbi("AccountCreated");
+
+  const topics = eventAbi.encodeFilterTopicsNoNull({});
 
   /**
    * Filter criteria to get the events from the governor contract that we are interested in
    * This way we can get all of them in one call
    */
-  const filterCriteria = [
+  const filterCriteria: FilterCriteria[] = [
     {
-      address: simpleAccountFactoryContractAddress,
-      topic0: accountCreatedEvent.signature,
+      criteria: {
+        address: simpleAccountFactoryContractAddress,
+        topic0: topics[0] ?? undefined,
+        topic1: topics[1] ?? undefined,
+        topic2: topics[2] ?? undefined,
+        topic3: topics[3] ?? undefined,
+        topic4: topics[4] ?? undefined,
+      },
+      eventAbi,
     },
   ];
 
   const fromBlock = env === "mainnet" ? MAINNET_SNAPSHOT_BLOCK : 0;
-  const events = await getAllEvents({
+  const events = await getAllEventLogs({
+    nodeUrl: thor.httpClient.baseURL,
     thor,
-    filterCriteria,
     from: fromBlock,
+    to: undefined,
+    filterCriteria,
   });
 
   /**
@@ -58,21 +67,20 @@ export const getAccountsCreatedEvents = async (
 
   //   TODO: runtime validation with zod ?
   events.forEach((event) => {
-    switch (event.topics[0]) {
-      case accountCreatedEvent.signature: {
-        const decoded = accountCreatedEvent.decode(event.data, event.topics);
-        decodedCreatedAccountsEvents.push({
-          address: decoded[0],
-          owner: decoded[1],
-          salt: decoded[2],
-        });
-        break;
-      }
-
-      default: {
-        throw new Error("Unknown event");
-      }
+    if (!event.decodedData) {
+      throw new Error("Event data not decoded");
     }
+
+    const [address, owner, salt] = event.decodedData as [
+      string,
+      string,
+      string,
+    ];
+    decodedCreatedAccountsEvents.push({
+      address,
+      owner,
+      salt,
+    });
   });
 
   return {

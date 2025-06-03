@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import Connex from "@vechain/connex";
 import { getAccountsCreatedEvents } from "./getAccountCreatedEvents";
 import { EnvConfig } from "@repo/config/contracts";
 import { getConfig } from "@repo/config";
+import { ThorClient } from "@vechain/vechain-kit";
 
 export const getAccountCreatedEventsQueryKey = (env: EnvConfig) => [
   "accountsCreated",
@@ -12,10 +12,7 @@ export const getAccountCreatedEventsQueryKey = (env: EnvConfig) => [
 export const useAccountCreatedEvents = (env: EnvConfig) => {
   const config = getConfig(env);
 
-  const thor = new Connex.Thor({
-    node: config.network.urls[0],
-    network: config.network.type,
-  });
+  const thor = ThorClient.at(config.network.urls[0]);
 
   return useQuery({
     queryKey: getAccountCreatedEventsQueryKey(env),

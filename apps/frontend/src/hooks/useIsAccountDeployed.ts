@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import Connex from "@vechain/connex";
 import { getConfig } from "@repo/config";
 import { EnvConfig } from "@repo/config/contracts";
+import { ThorClient } from "@vechain/vechain-kit";
+import { Address } from "@vechain/sdk-core";
 
 export const getIsAccountDeployedQueryKey = (
   address: string,
@@ -9,20 +10,17 @@ export const getIsAccountDeployedQueryKey = (
 ) => ["isAccountDeployed", address, env];
 
 const getIsAccountDeployed = async (
-  thor: Connex.Thor,
+  thor: ThorClient,
   address: string
 ): Promise<boolean> => {
-  const account = await thor.account(address).get();
-  return account.hasCode;
+  const accountDetail = await thor.accounts.getAccount(Address.of(address));
+  return accountDetail.hasCode;
 };
 
 export const useIsAccountDeployed = (env: EnvConfig, address?: string) => {
   const config = getConfig(env);
 
-  const thor = new Connex.Thor({
-    node: config.network.urls[0],
-    network: config.network.type,
-  });
+  const thor = ThorClient.at(config.network.urls[0]);
 
   return useQuery({
     queryKey: getIsAccountDeployedQueryKey(address ?? "", env),
