@@ -1,36 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
 import { SimpleAccountFactory__factory } from "@repo/contracts/typechain-types";
-import SimpleAccountFactoryAbi from "@repo/contracts/artifacts/contracts/accounts/SimpleAccountFactory.sol/SimpleAccountFactory.json";
 import { getConfig } from "@repo/config";
 import { EnvConfig } from "@repo/config/contracts";
-import Connex from "@vechain/connex";
-
-const SimpleAccountFactoryInterface =
-  SimpleAccountFactory__factory.createInterface();
+import { ThorClient } from "@vechain/vechain-kit";
 
 export const getAccountAddress = async (
-  thor: Connex.Thor,
+  thor: ThorClient,
   address: string,
   env: EnvConfig
 ): Promise<string> => {
-  const functionFragment =
-    SimpleAccountFactoryInterface.getFunction("getAccountAddress").format(
-      "json"
-    );
+  const res = await thor.contracts
+    .load(
+      getConfig(env).simpleAccountFactoryContractAddress,
+      SimpleAccountFactory__factory.abi
+    )
+    .read.getAccountAddress(address);
 
-  const fragment = SimpleAccountFactoryAbi.abi.find(
-    (fun) => fun.name === "getAccountAddress"
-  );
-  if (!fragment) throw new Error("getAccountAddress not found");
+  if (!res) throw new Error("Reverted");
 
-  const res = await thor
-    .account(getConfig(env).simpleAccountFactoryContractAddress)
-    .method(JSON.parse(functionFragment))
-    .call(address);
-
-  if (res.reverted) throw new Error("Reverted");
-
-  return res.decoded[0];
+  return res[0].toString();
 };
 
 export const getAccountAddressQueryKey = (address: string, env: EnvConfig) => [
@@ -42,10 +30,7 @@ export const getAccountAddressQueryKey = (address: string, env: EnvConfig) => [
 export const useGetAccountAddress = (address: string, env: EnvConfig) => {
   const config = getConfig(env);
 
-  const thor = new Connex.Thor({
-    node: config.network.urls[0],
-    network: config.network.type,
-  });
+  const thor = ThorClient.at(config.network.urls[0]);
 
   return useQuery({
     queryKey: getAccountAddressQueryKey(address, env),

@@ -2,30 +2,24 @@ import { getConfig } from "@repo/config";
 import { EnvConfig } from "@repo/config/contracts";
 import { SimpleAccountFactory__factory } from "@repo/contracts";
 import { useQuery } from "@tanstack/react-query";
-import Connex from "@vechain/connex";
-
-const SimpleAccountFactoryInterface =
-  SimpleAccountFactory__factory.createInterface();
+import { ThorClient } from "@vechain/vechain-kit";
 
 export const getSmartAccountVersion = async (
-  thor: Connex.Thor,
+  thor: ThorClient,
   smartAccountAddress: string,
   ownerAddress: string,
   env: EnvConfig
 ): Promise<number> => {
-  const functionFragment =
-    SimpleAccountFactoryInterface.getFunction("getAccountVersion").format(
-      "json"
-    );
+  const res = await thor.contracts
+    .load(
+      getConfig(env).simpleAccountFactoryContractAddress,
+      SimpleAccountFactory__factory.abi
+    )
+    .read.getAccountVersion(smartAccountAddress, ownerAddress);
 
-  const res = await thor
-    .account(getConfig(env).simpleAccountFactoryContractAddress)
-    .method(JSON.parse(functionFragment))
-    .call(smartAccountAddress, ownerAddress);
+  if (!res) throw new Error("Reverted");
 
-  if (res.reverted) throw new Error("Reverted");
-
-  return parseInt(res.decoded[0]);
+  return parseInt(res[0].toString());
 };
 
 export const getSmartAccountVersionQueryKey = (
@@ -45,10 +39,7 @@ export const useSmartAccountVersion = (
 ) => {
   const config = getConfig(env);
 
-  const thor = new Connex.Thor({
-    node: config.network.urls[0],
-    network: config.network.type,
-  });
+  const thor = ThorClient.at(config.network.urls[0]);
 
   return useQuery({
     queryKey: getSmartAccountVersionQueryKey(

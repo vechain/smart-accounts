@@ -1,27 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { SimpleAccountFactory__factory } from "@repo/contracts/typechain-types";
-import Connex from "@vechain/connex";
+import { ThorClient } from "@vechain/vechain-kit";
 import { EnvConfig } from "@repo/config/contracts";
 import { getConfig } from "@repo/config";
 
-const SimpleAccountFactoryInterface =
-  SimpleAccountFactory__factory.createInterface();
-
 export const getVersion = async (
-  thor: Connex.Thor,
+  thor: ThorClient,
   contractAddress: string
 ): Promise<number | string> => {
-  const functionFragment =
-    SimpleAccountFactoryInterface.getFunction("version").format("json");
+  const res = await thor.contracts
+    .load(contractAddress, SimpleAccountFactory__factory.abi)
+    .read.version();
 
-  const res = await thor
-    .account(contractAddress)
-    .method(JSON.parse(functionFragment))
-    .call();
+  if (!res) return "Unknown";
 
-  if (res.reverted) return "Unknown";
-
-  return res.decoded[0];
+  return res[0].toString();
 };
 
 export const getVersionQueryKey = (contractAddress: string, env: EnvConfig) => [
@@ -37,10 +30,7 @@ export const getVersionQueryKey = (contractAddress: string, env: EnvConfig) => [
 export const useContractVersion = (contractAddress: string, env: EnvConfig) => {
   const config = getConfig(env);
 
-  const thor = new Connex.Thor({
-    node: config.network.urls[0],
-    network: config.network.type,
-  });
+  const thor = ThorClient.at(config.network.urls[0]);
 
   return useQuery({
     queryKey: getVersionQueryKey(contractAddress, env),
