@@ -1,5 +1,5 @@
+import { EnhancedClause } from "@vechain/vechain-kit";
 import { Interface } from "ethers";
-import { EnhancedClause } from "./hooks";
 
 // Define a type to infer method names from the function definition
 type MethodName<T> = T extends (nameOrSignature: infer U) => any ? U : never;
