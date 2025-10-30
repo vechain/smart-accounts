@@ -44,6 +44,6 @@
   ],
   "resolutions": {
     "elliptic": "6.6.1",
-    "sha.js": "2.4.12"
+    "pbkdf2": "3.1.3"
   }
 }
