@@ -14,16 +14,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <ChakraProvider theme={theme}>
         <VeChainKitProvider
-          feeDelegation={{
-            delegatorUrl: import.meta.env.VITE_DELEGATOR_URL!,
-            delegateAllTransactions: false,
-          }}
           dappKit={{
             allowedWallets: ["veworld", "sync2"],
-          }}
-          loginModalUI={{
-            description:
-              "Choose between social login through VeChain or by connecting your wallet.",
           }}
           darkMode={false}
           language={"en"}
@@ -31,9 +23,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             type: "main",
           }}
           loginMethods={[
-            { method: "vechain", gridColumn: 4 },
-            { method: "dappkit", gridColumn: 4 },
-            { method: "ecosystem", gridColumn: 4 },
+            { method: "veworld", gridColumn: 4 },
+            { method: "google", gridColumn: 4 },
+            { method: "apple", gridColumn: 4 },
+            { method: "more", gridColumn: 4 },
           ]}
         >
           <App />
@@ -41,5 +34,5 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       </ChakraProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );
