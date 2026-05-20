@@ -63,7 +63,6 @@ const SupportedProjectItem = ({ href, logo, name }: SupportedProjectProps) => {
         border="1px solid"
         borderColor="border.subtle"
         bg="bg.surface"
-        backdropFilter="blur(20px)"
         transition="all 0.25s ease"
         _hover={{
           borderColor: "border.brand",

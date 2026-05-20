@@ -20,7 +20,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           }}
           theme={{
             modal: {
-              backgroundColor: "rgba(21, 21, 21, 0.9)",
+              backgroundColor: "rgba(21, 21, 21, 0.4)",
               border: "1px solid rgba(255, 255, 255, 0.20)",
               backdropFilter: "blur(20px)",
               rounded: "32px",

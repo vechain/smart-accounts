@@ -11,9 +11,8 @@ export const Navbar = () => {
       zIndex={50}
       borderBottom="1px solid"
       borderColor="border.subtle"
-      bg="rgba(5, 7, 15, 0.55)"
-      backdropFilter="blur(18px) saturate(160%)"
-      _light={{ bg: "rgba(247, 249, 252, 0.7)" }}
+      bg="rgba(5, 7, 15, 0.85)"
+      _light={{ bg: "rgba(247, 249, 252, 0.92)" }}
     >
       <Flex
         maxW="1200px"

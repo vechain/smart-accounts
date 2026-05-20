@@ -96,11 +96,6 @@ const theme = extendTheme({
       body: {
         bg: mode("#F7F9FC", "#05070F")(props),
         color: mode("gray.800", "whiteAlpha.900")(props),
-        backgroundImage: mode(
-          "radial-gradient(900px circle at 10% -10%, rgba(19,229,197,0.18) 0%, transparent 55%), radial-gradient(900px circle at 100% 20%, rgba(123,63,228,0.12) 0%, transparent 55%)",
-          "radial-gradient(900px circle at 10% -10%, rgba(19,229,197,0.18) 0%, transparent 50%), radial-gradient(900px circle at 90% 20%, rgba(123,63,228,0.22) 0%, transparent 50%), radial-gradient(700px circle at 50% 100%, rgba(19,229,197,0.08) 0%, transparent 60%)"
-        )(props),
-        backgroundAttachment: "fixed",
         fontFeatureSettings: '"cv02", "cv03", "cv04", "cv11"',
       },
       "::selection": {
@@ -113,8 +108,7 @@ const theme = extendTheme({
     Card: {
       baseStyle: (props: StyleFunctionProps) => ({
         container: {
-          bg: mode("rgba(255,255,255,0.65)", "rgba(255,255,255,0.03)")(props),
-          backdropFilter: "blur(20px) saturate(140%)",
+          bg: mode("rgba(255,255,255,0.85)", "rgba(17,23,42,0.55)")(props),
           border: "1px solid",
           borderColor: mode(
             "rgba(15,23,42,0.08)",
