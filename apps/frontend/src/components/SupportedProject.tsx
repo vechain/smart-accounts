@@ -1,17 +1,17 @@
 import {
   Box,
-  Card,
-  CardBody,
-  CardHeader,
-  Grid,
-  Heading,
   Image,
   Link,
+  SimpleGrid,
   Text,
+  VStack,
 } from "@chakra-ui/react";
 import CleanifyLogo from "../assets/cleanify.png";
 import MugshotLogo from "../assets/mugshot.png";
 import EVEarnLogo from "../assets/evearn.png";
+import GreenCartLogo from "../assets/greencart.png";
+import VeChainLogo from "../assets/vechain.png";
+import { SectionHeading } from "./SectionHeading";
 
 export interface SupportedProjectProps {
   href: string;
@@ -24,51 +24,83 @@ export const SupportedProject = () => {
     { href: "https://cleanify.vet", logo: CleanifyLogo, name: "Cleanify" },
     { href: "https://mugshot.vet", logo: MugshotLogo, name: "Mugshot" },
     { href: "https://evearn.io", logo: EVEarnLogo, name: "EVEarn" },
-    {
-      href: "https://greencart.ai",
-      logo: "https://www.greencart.ai/logo/greencart_favicon_colored.png",
-      name: "GreenCart",
-    },
-    {
-      href: "https://www.vechain.org",
-      logo: "https://vechain.org/wp-content/uploads/2025/02/VeChain_Icon_Quartz_300ppi.png",
-      name: "VeChain",
-    },
+    { href: "https://greencart.ai", logo: GreenCartLogo, name: "GreenCart" },
+    { href: "https://www.vechain.org", logo: VeChainLogo, name: "VeChain" },
   ];
 
   return (
-    <Card justifyContent={"center"} alignItems={"center"} variant={"outline"}>
-      <CardHeader>
-        <Heading size={"md"}>Supported by</Heading>
-      </CardHeader>
+    <VStack align="stretch" spacing={6}>
+      <SectionHeading
+        eyebrow="Ecosystem"
+        title="Supported by"
+        description="Projects already building on Smart Accounts."
+      />
 
-      <CardBody justifyContent={"center"}>
-        <Grid
-          templateColumns={["repeat(3, 1fr)", "repeat(5, 1fr)"]}
-          gap={8}
-          justifyContent={"center"}
-        >
-          {projects.map((project) => (
-            <SupportedProjectItem key={project.name} {...project} />
-          ))}
-        </Grid>
-      </CardBody>
-    </Card>
+      <SimpleGrid
+        columns={{ base: 3, sm: 5 }}
+        spacing={{ base: 4, md: 6 }}
+      >
+        {projects.map((project) => (
+          <SupportedProjectItem key={project.name} {...project} />
+        ))}
+      </SimpleGrid>
+    </VStack>
   );
 };
 
 const SupportedProjectItem = ({ href, logo, name }: SupportedProjectProps) => {
   return (
-    <Box
-      justifyContent={"center"}
-      alignItems={"center"}
-      display={"flex"}
-      flexDirection={"column"}
+    <Link
+      href={href}
+      isExternal
+      _hover={{ textDecoration: "none" }}
+      role="group"
     >
-      <Link href={href} isExternal>
-        <Image src={logo} alt={`${name} logo`} w={"80px"} rounded="full" />
-      </Link>
-      <Text>{name}</Text>
-    </Box>
+      <VStack
+        spacing={3}
+        p={4}
+        rounded="2xl"
+        border="1px solid"
+        borderColor="border.subtle"
+        bg="bg.surface"
+        backdropFilter="blur(20px)"
+        transition="all 0.25s ease"
+        _hover={{
+          borderColor: "border.brand",
+          transform: "translateY(-3px)",
+          bg: "bg.surface.hover",
+        }}
+      >
+        <Box
+          boxSize="64px"
+          rounded="2xl"
+          overflow="hidden"
+          bg="whiteAlpha.100"
+          _light={{ bg: "blackAlpha.50" }}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          p={2}
+          transition="transform 0.25s ease"
+          _groupHover={{ transform: "scale(1.06)" }}
+        >
+          <Image
+            src={logo}
+            alt={`${name} logo`}
+            maxW="100%"
+            maxH="100%"
+            objectFit="contain"
+          />
+        </Box>
+        <Text
+          fontSize="xs"
+          fontWeight={600}
+          color="text.secondary"
+          letterSpacing="-0.01em"
+        >
+          {name}
+        </Text>
+      </VStack>
+    </Link>
   );
 };

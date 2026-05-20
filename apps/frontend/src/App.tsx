@@ -1,15 +1,22 @@
-import { Container, VStack } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import { Home } from "./pages/Home";
 import { Navbar } from "./components/Navbar";
 
 function App() {
   return (
-    <Container maxW="container.lg" h="full">
-      <VStack align="stretch" flex="1" overflowY={"auto"} py={4}>
-        <Navbar />
+    <Box minH="100vh" w="full">
+      <Navbar />
+      <Box
+        as="main"
+        maxW="1200px"
+        mx="auto"
+        px={{ base: 4, md: 8 }}
+        pt={{ base: 6, md: 10 }}
+        pb={{ base: 12, md: 20 }}
+      >
         <Home />
-      </VStack>
-    </Container>
+      </Box>
+    </Box>
   );
 }
 

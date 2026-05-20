@@ -55,37 +55,50 @@ export const AddressButton: React.FC<IAddressButton> = ({
     setValue(address);
   }, [address, setValue]);
 
-  const spacing = ["xs", "sm"].includes(buttonSize) ? 2 : 4;
+  const spacing = ["xs", "sm"].includes(buttonSize) ? 2 : 3;
 
   return (
     <Button
       data-cy={`address-button-${address}`}
       size={buttonSize}
-      colorScheme={"gray"}
       onClick={onClickHandler}
-      {...(showAddressIcon && { paddingLeft: 0 })}
-      paddingY={0}
-      px={0}
+      pl={showAddressIcon ? 1 : 3}
+      pr={3}
+      borderRadius="full"
       variant="outline"
+      borderColor="border.subtle"
+      bg="whiteAlpha.50"
+      _light={{ bg: "blackAlpha.50" }}
+      _hover={{
+        bg: "whiteAlpha.100",
+        borderColor: "border.brand",
+        _light: { bg: "white" },
+      }}
+      transition="all 0.15s ease"
       {...otherProps}
     >
       <HStack
         justify={"flex-start"}
         spacing={spacing}
         h="full"
-        roundedLeft={"md"}
       >
         {showInfoIcon && (
           <Icon
             data-cy="address-button-info-icon"
             aria-label="View details"
             as={FaWallet}
+            color="text.muted"
           />
         )}
         {showAddressIcon && (
-          <AddressIcon address={address} roundedLeft={"md"} {...imageProps} />
+          <AddressIcon address={address} rounded="full" {...imageProps} />
         )}
-        <Text {...addressTextProps}>
+        <Text
+          fontFamily="mono"
+          fontWeight={500}
+          letterSpacing="-0.01em"
+          {...addressTextProps}
+        >
           {showFullAddress
             ? address
             : humanAddress(address, charAtStart, charAtEnd)}
@@ -95,6 +108,9 @@ export const AddressButton: React.FC<IAddressButton> = ({
             data-cy="address-button-copy-icon"
             aria-label="Copy Address"
             as={hasCopied ? FaCheck : FaCopy}
+            color={hasCopied ? "brand.400" : "text.muted"}
+            boxSize="12px"
+            transition="color 0.15s ease"
           />
         )}
       </HStack>
@@ -105,13 +121,12 @@ export const AddressButton: React.FC<IAddressButton> = ({
 export const AddressButtonGhostVariant = (props: IAddressButton) => (
   <AddressButton
     buttonSize="sm"
-    variant={"ghost"}
     imageProps={{
       rounded: "full",
       boxSize: "20px",
     }}
     addressTextProps={{
-      fontSize: "md",
+      fontSize: "sm",
       fontWeight: 500,
     }}
     {...props}
