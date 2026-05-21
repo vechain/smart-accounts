@@ -12,6 +12,10 @@ export const Home = () => {
     <VStack align="stretch" gap={{ base: 12, md: 16 }}>
       <Hero />
 
+      <SupportedProject />
+
+      <Readme />
+
       <VStack align="stretch" gap={5}>
         <SectionHeading
           eyebrow="Live data"
@@ -33,10 +37,6 @@ export const Home = () => {
       <NetworkInsights />
 
       <AbstractedAccounts />
-
-      <Readme />
-
-      <SupportedProject />
     </VStack>
   );
 };

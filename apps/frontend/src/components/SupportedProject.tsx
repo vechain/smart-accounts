@@ -1,10 +1,9 @@
-import { Image, Link, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Image, Link, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import CleanifyLogo from "../assets/cleanify.png";
 import MugshotLogo from "../assets/mugshot.png";
 import EVEarnLogo from "../assets/evearn.png";
 import GreenCartLogo from "../assets/greencart.png";
 import VeChainLogo from "../assets/vechain.png";
-import { SectionHeading } from "./SectionHeading";
 
 export interface SupportedProjectProps {
   href: string;
@@ -23,14 +22,87 @@ export const SupportedProject = () => {
 
   return (
     <VStack align="stretch" gap={6}>
-      <SectionHeading
-        eyebrow="Ecosystem"
-        title="Supported by"
-        description="Projects already building on Smart Accounts."
-      />
+      <Text color="text.muted" textStyle="sm" textAlign="center">
+        Projects already building on Smart Accounts.
+      </Text>
 
+      {/* Mobile: horizontal swipe with snap points */}
+      <VStack
+        display={{ base: "flex", sm: "none" }}
+        align="stretch"
+        gap={2}
+        position="relative"
+      >
+        <HStack
+          gap={3}
+          overflowX="auto"
+          scrollSnapType="x mandatory"
+          mr={-4}
+          pl={6}
+          pr={10}
+          pb={1}
+          css={{
+            scrollbarWidth: "none",
+            "&::-webkit-scrollbar": { display: "none" },
+          }}
+        >
+          {projects.map((project) => (
+            <Box
+              key={project.name}
+              flexShrink={0}
+              w="140px"
+              scrollSnapAlign="start"
+            >
+              <SupportedProjectItem {...project} />
+            </Box>
+          ))}
+        </HStack>
+
+        {/* Right-edge fade — visual hint that content extends past the viewport */}
+        <Box
+          position="absolute"
+          top={0}
+          bottom={4}
+          right={-4}
+          w="48px"
+          pointerEvents="none"
+          bgImage="linear-gradient(to left, rgba(5,7,15,0.95), transparent)"
+          _light={{
+            bgImage:
+              "linear-gradient(to left, rgba(247,249,252,0.95), transparent)",
+          }}
+        />
+
+        <HStack justify="center" gap={1.5} pt={1}>
+          <Text
+            textStyle="2xs"
+            color="text.subtle"
+            letterSpacing="0.08em"
+            textTransform="uppercase"
+            fontWeight={500}
+          >
+            Swipe to see more
+          </Text>
+          <Box
+            as="span"
+            color="text.subtle"
+            css={{
+              animation: "nudge 1.4s ease-in-out infinite",
+              "@keyframes nudge": {
+                "0%, 100%": { transform: "translateX(0)" },
+                "50%": { transform: "translateX(3px)" },
+              },
+            }}
+          >
+            →
+          </Box>
+        </HStack>
+      </VStack>
+
+      {/* Tablet and up: 5-column grid */}
       <SimpleGrid
-        columns={{ base: 3, sm: 5 }}
+        display={{ base: "none", sm: "grid" }}
+        columns={5}
         gap={{ base: 4, md: 6 }}
       >
         {projects.map((project) => (
