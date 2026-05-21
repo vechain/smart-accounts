@@ -12,7 +12,6 @@ export const Navbar = () => {
       borderBottom="1px solid"
       borderColor="border.subtle"
       bg="rgba(5, 7, 15, 0.85)"
-      backdropFilter="blur(2px)"
       _light={{ bg: "rgba(247, 249, 252, 0.92)" }}
     >
       <Flex
