@@ -55,6 +55,7 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=6144"
         run: |
           yarn contracts:analyze-deep:mainnet
+          yarn contracts:analyze-rewards:mainnet
           yarn contracts:export-insights:mainnet
 
       - name: Commit and push if insights changed

@@ -517,6 +517,97 @@ export const NetworkInsights = () => {
           </Card.Root>
         </>
       )}
+
+      {data.topX2EarnApps && data.topX2EarnApps.items.length > 0 && (
+        <Card.Root>
+          <Card.Body p={6}>
+            <VStack align="stretch" gap={4}>
+              <HStack justify="space-between" align="baseline">
+                <VStack align="flex-start" gap={0.5}>
+                  <Heading size="sm" letterSpacing="-0.02em">
+                    Apps still rewarding V1 accounts
+                  </Heading>
+                  <Text textStyle="xs" color="text.muted">
+                    Top X2Earn apps by unique V1 receivers — these users would
+                    benefit most from upgrading.
+                  </Text>
+                </VStack>
+              </HStack>
+
+              <VStack align="stretch" gap={0} divideY="1px" divideColor="border.subtle">
+                {data.topX2EarnApps.items.map((row, idx) => (
+                  <HStack
+                    key={row.appId}
+                    py={3}
+                    gap={4}
+                    justify="space-between"
+                  >
+                    <HStack gap={3} minW={0} flex={1}>
+                      <Text
+                        textStyle="xs"
+                        color="text.subtle"
+                        fontFamily="mono"
+                        w="20px"
+                      >
+                        {(idx + 1).toString().padStart(2, "0")}
+                      </Text>
+                      <VStack align="flex-start" gap={0} minW={0}>
+                        <Text
+                          fontWeight={600}
+                          color="text.primary"
+                          truncate
+                          maxW="280px"
+                        >
+                          {row.name}
+                        </Text>
+                        <Text
+                          textStyle="xs"
+                          color="text.subtle"
+                          fontFamily="mono"
+                          truncate
+                          maxW="280px"
+                        >
+                          {row.appId.slice(0, 10)}…{row.appId.slice(-6)}
+                        </Text>
+                      </VStack>
+                    </HStack>
+                    <HStack gap={6}>
+                      <VStack align="flex-end" gap={0}>
+                        <Text
+                          fontFamily="mono"
+                          fontWeight={700}
+                          color="text.primary"
+                        >
+                          {formatCount(row.uniqueReceivers)}
+                        </Text>
+                        <Text textStyle="xs" color="text.subtle">
+                          V1 receivers
+                        </Text>
+                      </VStack>
+                      <VStack
+                        align="flex-end"
+                        gap={0}
+                        display={{ base: "none", md: "flex" }}
+                      >
+                        <Text
+                          fontFamily="mono"
+                          fontWeight={600}
+                          color="text.secondary"
+                        >
+                          {formatToken(row.totalAmount, 18, 1)}
+                        </Text>
+                        <Text textStyle="xs" color="text.subtle">
+                          B3TR sent
+                        </Text>
+                      </VStack>
+                    </HStack>
+                  </HStack>
+                ))}
+              </VStack>
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+      )}
     </VStack>
   );
 };

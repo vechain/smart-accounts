@@ -1,8 +1,71 @@
 import { useQuery } from "@tanstack/react-query";
 import bundledMainnet from "../data/insights-mainnet.json";
 
-// The shape comes from packages/contracts/scripts/analytics/exportInsights.ts.
-export type Insights = typeof bundledMainnet;
+export type Granularity = "daily" | "weekly" | "monthly";
+
+export type SeriesBucket = {
+  key: string;
+  total: number;
+  v3Originated: number;
+  v1Originated: number;
+};
+export type MonthlyBucket = SeriesBucket & { cumulative: number };
+
+export type TokenKey = "vet" | "b3tr" | "vot3" | "vtho";
+export type VersionKey = "nativeV3" | "upgradedV1ToV3" | "stillV1";
+
+export type VersionTreasury = {
+  accounts: number;
+  withBalance: number;
+  totals: Record<TokenKey, string>;
+  holders: Record<TokenKey, number>;
+  tiers: { hot: number; warm: number; cold: number };
+};
+
+export type Treasury = {
+  accountsCounted: number;
+  fleet: {
+    totals: Record<TokenKey, string>;
+    holders: Record<TokenKey, number>;
+  };
+  byVersion: Record<VersionKey, VersionTreasury>;
+};
+
+export type X2EarnAppRow = {
+  appId: string;
+  name: string;
+  uniqueReceivers: number;
+  rewardEvents: number;
+  totalAmount: string;
+};
+
+export type TopX2EarnApps = {
+  scannedThroughBlock: number;
+  items: X2EarnAppRow[];
+};
+
+export type Insights = {
+  generatedAt: string;
+  network: string;
+  factory: string;
+  snapshotBlock: number;
+  snapshotTimestamp: number;
+  totals: {
+    total: number;
+    nativeV3: number;
+    upgradedV1ToV3: number;
+    stillV1: number;
+    other: number;
+    v3AdoptionPercent: number;
+  };
+  series: {
+    daily: SeriesBucket[];
+    weekly: SeriesBucket[];
+    monthly: MonthlyBucket[];
+  };
+  treasury: Treasury | null;
+  topX2EarnApps: TopX2EarnApps | null;
+};
 
 const REPO = "vechain/smart-accounts";
 const BRANCH = "main";
@@ -18,10 +81,10 @@ const remoteUrl = (env: "mainnet" | "testnet") =>
   )}`;
 
 const fallback: Record<"mainnet" | "testnet", Insights> = {
-  mainnet: bundledMainnet,
+  mainnet: bundledMainnet as Insights,
   // We don't bundle a testnet snapshot; treat the mainnet one as a structural
   // placeholder so types stay happy. The chart hides if data is empty.
-  testnet: bundledMainnet,
+  testnet: bundledMainnet as Insights,
 };
 
 const fetchInsights = async (env: "mainnet" | "testnet"): Promise<Insights> => {
@@ -39,10 +102,7 @@ export const useInsights = (env: "mainnet" | "testnet" = "mainnet") =>
   useQuery({
     queryKey: getInsightsQueryKey(env),
     queryFn: () => fetchInsights(env),
-    // Show the bundled snapshot immediately, then swap in the fresh fetch.
     initialData: fallback[env],
-    // Bundled JSON is built into the deploy artifact, so it's only as fresh as
-    // the last build. Always re-fetch on mount so the CDN copy wins.
     staleTime: 0,
     refetchOnWindowFocus: false,
     retry: 1,

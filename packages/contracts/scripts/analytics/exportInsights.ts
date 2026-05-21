@@ -33,6 +33,10 @@ const BALANCES_CACHE_PATH = path.join(
   CACHE_DIR,
   `balances-${network.name}-${factoryAddress.toLowerCase()}.json`
 );
+const REWARDS_CACHE_PATH = path.join(
+  CACHE_DIR,
+  `rewards-${network.name}-${factoryAddress.toLowerCase()}.json`
+);
 
 const OUTPUT_PATH = path.resolve(
   __dirname,
@@ -126,9 +130,26 @@ async function main() {
     );
   }
 
+  type RewardsCache = {
+    maxBlockScanned: number;
+    byAppId: Record<
+      string,
+      { name?: string; count: number; totalAmount: string; receivers: string[] }
+    >;
+  };
+  let rewards: RewardsCache | null = null;
+  if (fs.existsSync(REWARDS_CACHE_PATH)) {
+    rewards = readJson<RewardsCache>(REWARDS_CACHE_PATH);
+  } else {
+    console.warn(
+      "(no rewards cache found; topX2EarnApps section will be omitted)\n"
+    );
+  }
+
   console.log(`Events:    ${events.length}`);
   console.log(`Versions:  ${Object.keys(versions).length}`);
-  console.log(`Balances:  ${Object.keys(balances).length}\n`);
+  console.log(`Balances:  ${Object.keys(balances).length}`);
+  console.log(`Rewards:   ${rewards ? Object.keys(rewards.byAppId).length + " apps" : "n/a"}\n`);
 
   // Reclassify events by original implementation (V1 vs V3) using the same logic
   // as the analytics scripts.
@@ -406,6 +427,37 @@ async function main() {
     };
   }
 
+  // === Top X2Earn apps rewarding V1 receivers ===
+  let topX2EarnApps:
+    | {
+        scannedThroughBlock: number;
+        items: Array<{
+          appId: string;
+          name: string;
+          uniqueReceivers: number;
+          rewardEvents: number;
+          totalAmount: string;
+        }>;
+      }
+    | null = null;
+
+  if (rewards) {
+    const items = Object.entries(rewards.byAppId)
+      .map(([appId, agg]) => ({
+        appId,
+        name: agg.name ?? appId,
+        uniqueReceivers: agg.receivers.length,
+        rewardEvents: agg.count,
+        totalAmount: agg.totalAmount,
+      }))
+      .sort((a, b) => b.uniqueReceivers - a.uniqueReceivers)
+      .slice(0, 10);
+    topX2EarnApps = {
+      scannedThroughBlock: rewards.maxBlockScanned,
+      items,
+    };
+  }
+
   const total = nativeV3 + upgradedV1ToV3 + stillV1 + other;
   const insights = {
     generatedAt: new Date().toISOString(),
@@ -427,6 +479,7 @@ async function main() {
       monthly: monthlyWithCumulative,
     },
     treasury,
+    topX2EarnApps,
   };
 
   fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
