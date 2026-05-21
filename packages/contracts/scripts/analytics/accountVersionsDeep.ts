@@ -65,8 +65,13 @@ const VERSIONS_CACHE_PATH = path.join(
   CACHE_DIR,
   `versions-${network.name}-${factoryAddress.toLowerCase()}.json`
 );
+const BALANCES_CACHE_PATH = path.join(
+  CACHE_DIR,
+  `balances-${network.name}-${factoryAddress.toLowerCase()}.json`
+);
 const FORCE_REFRESH_EVENTS = process.env.REFRESH_EVENTS === "1";
 const FORCE_REFRESH_VERSIONS = process.env.REFRESH_VERSIONS === "1";
+const FORCE_REFRESH_BALANCES = process.env.REFRESH_BALANCES === "1";
 
 const http = axios.create({ timeout: HTTP_TIMEOUT_MS });
 
@@ -197,6 +202,28 @@ function loadVersionsCache(): Record<string, number | null> | null {
 function saveVersionsCache(map: Record<string, number | null>) {
   if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
   fs.writeFileSync(VERSIONS_CACHE_PATH, JSON.stringify(map));
+}
+
+type BalanceEntry = {
+  vet: string;
+  vtho: string;
+  b3tr: string;
+  vot3: string;
+};
+
+function loadBalancesCache(): Record<string, BalanceEntry> | null {
+  if (FORCE_REFRESH_BALANCES) return null;
+  if (!fs.existsSync(BALANCES_CACHE_PATH)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(BALANCES_CACHE_PATH, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function saveBalancesCache(map: Record<string, BalanceEntry>) {
+  if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+  fs.writeFileSync(BALANCES_CACHE_PATH, JSON.stringify(map));
 }
 
 function buildInitCodeHash(
@@ -542,85 +569,104 @@ async function main() {
   if (stillV1.length > 0) {
     console.log(`\n--- Still V1 activity (${stillV1.length} accounts) ---`);
 
-    // Per account, three clauses: VTHO.balanceOf, B3TR.balanceOf, VOT3.balanceOf.
-    const balanceClauses: { to: string; data: string }[] = [];
-    const tokenList: { addr: string; label: string }[] = [
-      { addr: b3trAddr, label: "B3TR" },
-      { addr: vot3Addr, label: "VOT3" },
-      { addr: vthoAddr, label: "VTHO" },
+    const tokenList: { addr: string; label: keyof BalanceEntry }[] = [
+      { addr: b3trAddr, label: "b3tr" },
+      { addr: vot3Addr, label: "vot3" },
+      { addr: vthoAddr, label: "vtho" },
     ];
     const enabledTokens = tokenList.filter((t) => t.addr);
 
-    for (const c of stillV1) {
-      for (const t of enabledTokens) {
-        balanceClauses.push({
-          to: t.addr,
-          data:
-            BALANCE_OF_SELECTOR +
-            ethers.zeroPadValue(c.address, 32).slice(2),
-        });
+    let balancesMap = loadBalancesCache() ?? {};
+    const needBalances = stillV1.filter((c) => !(c.address in balancesMap));
+
+    if (needBalances.length > 0) {
+      console.log(
+        `Querying ERC20 balances for ${needBalances.length} accounts (rest from cache)...`
+      );
+      const balanceClauses: { to: string; data: string }[] = [];
+      for (const c of needBalances) {
+        for (const t of enabledTokens) {
+          balanceClauses.push({
+            to: t.addr,
+            data:
+              BALANCE_OF_SELECTOR +
+              ethers.zeroPadValue(c.address, 32).slice(2),
+          });
+        }
       }
+      const balanceResults = await batchSimulateClauses(
+        balanceClauses,
+        "balanceOf"
+      );
+
+      console.log(`Fetching VET balances for ${needBalances.length} accounts...`);
+      const infos = await fetchAccountInfos(
+        needBalances.map((c) => c.address),
+        "VET balance"
+      );
+
+      for (let i = 0; i < needBalances.length; i++) {
+        const entry: BalanceEntry = { vet: "0", vtho: "0", b3tr: "0", vot3: "0" };
+        for (let k = 0; k < enabledTokens.length; k++) {
+          const t = enabledTokens[k];
+          const r = balanceResults[i * enabledTokens.length + k];
+          entry[t.label] = (!r || r.reverted ? 0n : parseUint(r.data)).toString();
+        }
+        entry.vet = parseUint(infos[i]?.balance).toString();
+        balancesMap[needBalances[i].address] = entry;
+      }
+      saveBalancesCache(balancesMap);
+    } else {
+      console.log("Loaded balance results from cache.");
     }
 
-    const balanceResults = await batchSimulateClauses(
-      balanceClauses,
-      "balanceOf"
-    );
-
-    // Also fetch VET/VTHO from /accounts/{addr} — gives us VET balance + a check on VTHO.
-    console.log(`Fetching VET balance for still-V1 accounts...`);
-    const infos = await fetchAccountInfos(
-      stillV1.map((c) => c.address),
-      "VET/VTHO"
-    );
-
-    const tokenTotals: Record<string, bigint> = {};
-    const tokenHolders: Record<string, number> = {};
-    for (const t of enabledTokens) {
-      tokenTotals[t.label] = 0n;
-      tokenHolders[t.label] = 0;
-    }
-    let vetTotal = 0n;
-    let vetHolders = 0;
+    const tokenTotals: Record<string, bigint> = {
+      VET: 0n,
+      B3TR: 0n,
+      VOT3: 0n,
+      VTHO: 0n,
+    };
+    const tokenHolders: Record<string, number> = {
+      VET: 0,
+      B3TR: 0,
+      VOT3: 0,
+      VTHO: 0,
+    };
     let anyAssetHolders = 0;
     let allEmpty = 0;
 
-    for (let i = 0; i < stillV1.length; i++) {
+    for (const c of stillV1) {
+      const b = balancesMap[c.address];
+      if (!b) continue;
+      const vals: Record<string, bigint> = {
+        VET: BigInt(b.vet),
+        B3TR: BigInt(b.b3tr),
+        VOT3: BigInt(b.vot3),
+        VTHO: BigInt(b.vtho),
+      };
       let hasAny = false;
-      for (let k = 0; k < enabledTokens.length; k++) {
-        const t = enabledTokens[k];
-        const r = balanceResults[i * enabledTokens.length + k];
-        const v = !r || r.reverted ? 0n : parseUint(r.data);
-        tokenTotals[t.label] += v;
-        if (v > 0n) {
-          tokenHolders[t.label]++;
+      for (const k of Object.keys(vals)) {
+        tokenTotals[k] += vals[k];
+        if (vals[k] > 0n) {
+          tokenHolders[k]++;
           hasAny = true;
         }
-      }
-      const vet = parseUint(infos[i]?.balance);
-      vetTotal += vet;
-      if (vet > 0n) {
-        vetHolders++;
-        hasAny = true;
       }
       if (hasAny) anyAssetHolders++;
       else allEmpty++;
     }
 
+    const labels = ["VET", "B3TR", "VOT3", "VTHO"];
     console.log(`\n  Holders (balance > 0):`);
-    console.log(`    VET:   ${vetHolders}`);
-    for (const t of enabledTokens) {
-      console.log(`    ${t.label.padEnd(6)} ${tokenHolders[t.label]}`);
+    for (const k of labels) {
+      console.log(`    ${k.padEnd(6)} ${tokenHolders[k]}`);
     }
     console.log(`    Any:   ${anyAssetHolders}`);
     console.log(`    Empty: ${allEmpty}`);
 
     console.log(`\n  Total balances:`);
-    console.log(`    VET:   ${formatWei(vetTotal)}`);
-    for (const t of enabledTokens) {
-      console.log(
-        `    ${t.label.padEnd(6)} ${formatWei(tokenTotals[t.label])}`
-      );
+    for (const k of labels) {
+      console.log(`    ${k.padEnd(6)} ${formatWei(tokenTotals[k])}`);
     }
   }
 

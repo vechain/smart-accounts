@@ -13,9 +13,10 @@ export type AccountCreatedEvent = {
 // When fetching the events from the mainnet we are having
 // some scalability issues (calling thousends of events)
 // so we are taking a snapshot at a specific block and then
-// fetching the events from that block
-const MAINNET_SNAPSHOT_BLOCK = 21086312;
-const MAINNET_CREATED_ACCOUNTS_COUNT_AT_SNAPSHOT = 135243;
+// fetching the events from that block.
+// Refreshed from scripts/analytics/accountVersions.ts cache.
+const MAINNET_SNAPSHOT_BLOCK = 24873604;
+const MAINNET_CREATED_ACCOUNTS_COUNT_AT_SNAPSHOT = 588699;
 
 export const getAccountsCreatedEvents = async (
   thor: ThorClient,

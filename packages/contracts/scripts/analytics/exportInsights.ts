@@ -1,0 +1,312 @@
+import { ethers, artifacts, network } from "hardhat";
+import { Interface } from "ethers";
+import fs from "fs";
+import path from "path";
+import { getConfig } from "@repo/config";
+import { EnvConfig } from "@repo/config/contracts";
+import { SimpleAccountFactory__factory } from "../..";
+
+// Reads the events + versions + balances caches produced by accountVersions.ts /
+// accountVersionsDeep.ts and writes a small pre-aggregated insights JSON into the
+// frontend so charts can render without any on-chain calls.
+
+const env = process.env.VITE_APP_ENV as EnvConfig | undefined;
+if (!env) throw new Error("VITE_APP_ENV env variable must be set");
+
+const config = getConfig();
+const factoryAddress = config.simpleAccountFactoryContractAddress;
+const genesisTimestamp = config.network.genesis.timestamp;
+const BLOCK_TIME_SEC = 10;
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const CACHE_DIR = path.resolve(__dirname, ".cache");
+const EVENTS_CACHE_PATH = path.join(
+  CACHE_DIR,
+  `events-${network.name}-${factoryAddress.toLowerCase()}.json`
+);
+const VERSIONS_CACHE_PATH = path.join(
+  CACHE_DIR,
+  `versions-${network.name}-${factoryAddress.toLowerCase()}.json`
+);
+const BALANCES_CACHE_PATH = path.join(
+  CACHE_DIR,
+  `balances-${network.name}-${factoryAddress.toLowerCase()}.json`
+);
+
+const OUTPUT_PATH = path.resolve(
+  __dirname,
+  "../../../../apps/frontend/src/data",
+  `insights-${env}.json`
+);
+
+const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+
+type EventEntry = {
+  account: string;
+  owner: string;
+  salt: string;
+  blockNumber: number;
+};
+
+type BalanceEntry = {
+  vet: string;
+  vtho: string;
+  b3tr: string;
+  vot3: string;
+};
+
+function readJson<T>(p: string): T {
+  if (!fs.existsSync(p)) {
+    throw new Error(
+      `Cache file missing: ${p}\nRun the analytics scripts first (yarn contracts:analyze-deep:${env}).`
+    );
+  }
+  return JSON.parse(fs.readFileSync(p, "utf8"));
+}
+
+function buildInitCodeHash(
+  proxyBytecode: string,
+  simpleAccountIface: Interface,
+  impl: string,
+  owner: string
+): string {
+  const initData = simpleAccountIface.encodeFunctionData("initialize", [owner]);
+  const initCode = ethers.concat([
+    proxyBytecode,
+    abiCoder.encode(["address", "bytes"], [impl, initData]),
+  ]);
+  return ethers.keccak256(initCode);
+}
+
+function computeCreate2Address(salt: bigint, initCodeHash: string): string {
+  const saltBytes32 = ethers.zeroPadValue(ethers.toBeHex(salt), 32);
+  return ethers.getCreate2Address(factoryAddress, saltBytes32, initCodeHash);
+}
+
+function blockToMonth(blockNumber: number): string {
+  const ts = (genesisTimestamp + blockNumber * BLOCK_TIME_SEC) * 1000;
+  const d = new Date(ts);
+  const y = d.getUTCFullYear();
+  const m = (d.getUTCMonth() + 1).toString().padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+async function main() {
+  console.log(`\nExporting insights for ${env} (network ${network.name})`);
+  console.log(`Factory: ${factoryAddress}\n`);
+
+  const events: EventEntry[] = readJson(EVENTS_CACHE_PATH);
+  const versions: Record<string, number | null> = readJson(VERSIONS_CACHE_PATH);
+  let balances: Record<string, BalanceEntry> = {};
+  if (fs.existsSync(BALANCES_CACHE_PATH)) {
+    balances = readJson(BALANCES_CACHE_PATH);
+  } else {
+    console.warn(
+      "(no balances cache found; treasury section will be omitted)\n"
+    );
+  }
+
+  console.log(`Events:    ${events.length}`);
+  console.log(`Versions:  ${Object.keys(versions).length}`);
+  console.log(`Balances:  ${Object.keys(balances).length}\n`);
+
+  // Reclassify events by original implementation (V1 vs V3) using the same logic
+  // as the analytics scripts.
+  const factory = SimpleAccountFactory__factory.connect(
+    factoryAddress,
+    ethers.provider
+  );
+  const [v1Impl, v3Impl] = await Promise.all([
+    factory.accountImplementationV1(),
+    factory.accountImplementationV3(),
+  ]);
+
+  const proxyArt = await artifacts.readArtifact("ERC1967Proxy");
+  const simpleAccountArt = await artifacts.readArtifact("SimpleAccount");
+  const simpleAccountIface = new Interface(simpleAccountArt.abi);
+
+  type Per = {
+    address: string;
+    originalImpl: "V1" | "V3";
+    blockNumber: number;
+  };
+
+  const byAddress = new Map<string, Per>();
+  let maxBlock = 0;
+
+  for (const ev of events) {
+    if (ev.blockNumber > maxBlock) maxBlock = ev.blockNumber;
+    const salt = BigInt(ev.salt);
+    const v1Hash = buildInitCodeHash(
+      proxyArt.bytecode,
+      simpleAccountIface,
+      v1Impl,
+      ev.owner
+    );
+    const v3Hash = buildInitCodeHash(
+      proxyArt.bytecode,
+      simpleAccountIface,
+      v3Impl,
+      ev.owner
+    );
+    const v1Addr = computeCreate2Address(salt, v1Hash);
+    const v3Addr = computeCreate2Address(salt, v3Hash);
+
+    let entry: Per;
+    if (ev.account === ZERO_ADDRESS || ev.account === v1Addr) {
+      entry = { address: v1Addr, originalImpl: "V1", blockNumber: ev.blockNumber };
+    } else if (ev.account === v3Addr) {
+      entry = { address: v3Addr, originalImpl: "V3", blockNumber: ev.blockNumber };
+    } else {
+      continue;
+    }
+    const existing = byAddress.get(entry.address);
+    if (!existing || entry.blockNumber < existing.blockNumber) {
+      byAddress.set(entry.address, entry);
+    }
+  }
+
+  const unique = [...byAddress.values()];
+
+  // Version mix.
+  let nativeV3 = 0;
+  let upgradedV1ToV3 = 0;
+  let stillV1 = 0;
+  let other = 0;
+  for (const c of unique) {
+    const v = versions[c.address] ?? null;
+    if (v === 3) {
+      if (c.originalImpl === "V1") upgradedV1ToV3++;
+      else nativeV3++;
+    } else if (v === null) {
+      if (c.originalImpl === "V1") stillV1++;
+      else other++;
+    } else {
+      other++;
+    }
+  }
+
+  // Monthly creations.
+  type MonthBucket = {
+    month: string;
+    total: number;
+    v3Originated: number;
+    v1Originated: number;
+  };
+  const monthMap = new Map<string, MonthBucket>();
+  // unique is keyed by address — for monthly creations we use the first deploy block.
+  for (const c of unique) {
+    const month = blockToMonth(c.blockNumber);
+    let m = monthMap.get(month);
+    if (!m) {
+      m = { month, total: 0, v3Originated: 0, v1Originated: 0 };
+      monthMap.set(month, m);
+    }
+    m.total += 1;
+    if (c.originalImpl === "V3") m.v3Originated += 1;
+    else m.v1Originated += 1;
+  }
+
+  const monthly = [...monthMap.values()].sort((a, b) =>
+    a.month < b.month ? -1 : 1
+  );
+  // Cumulative total.
+  let running = 0;
+  const monthlyWithCumulative = monthly.map((m) => {
+    running += m.total;
+    return { ...m, cumulative: running };
+  });
+
+  // Still V1 treasury.
+  let treasury:
+    | {
+        accounts: number;
+        holders: { vet: number; b3tr: number; vot3: number; vtho: number; any: number; empty: number };
+        totals: { vet: string; b3tr: string; vot3: string; vtho: string };
+      }
+    | null = null;
+
+  if (Object.keys(balances).length > 0) {
+    let vetTotal = 0n;
+    let b3trTotal = 0n;
+    let vot3Total = 0n;
+    let vthoTotal = 0n;
+    const holders = { vet: 0, b3tr: 0, vot3: 0, vtho: 0, any: 0, empty: 0 };
+    let counted = 0;
+
+    for (const c of unique) {
+      if (c.originalImpl !== "V1") continue;
+      if (versions[c.address] !== null) continue; // only "still V1"
+      const b = balances[c.address];
+      if (!b) continue;
+      counted++;
+      const vet = BigInt(b.vet);
+      const b3tr = BigInt(b.b3tr);
+      const vot3 = BigInt(b.vot3);
+      const vtho = BigInt(b.vtho);
+      vetTotal += vet;
+      b3trTotal += b3tr;
+      vot3Total += vot3;
+      vthoTotal += vtho;
+      let any = false;
+      if (vet > 0n) { holders.vet++; any = true; }
+      if (b3tr > 0n) { holders.b3tr++; any = true; }
+      if (vot3 > 0n) { holders.vot3++; any = true; }
+      if (vtho > 0n) { holders.vtho++; any = true; }
+      if (any) holders.any++; else holders.empty++;
+    }
+
+    treasury = {
+      accounts: counted,
+      holders,
+      totals: {
+        vet: vetTotal.toString(),
+        b3tr: b3trTotal.toString(),
+        vot3: vot3Total.toString(),
+        vtho: vthoTotal.toString(),
+      },
+    };
+  }
+
+  const total = nativeV3 + upgradedV1ToV3 + stillV1 + other;
+  const insights = {
+    generatedAt: new Date().toISOString(),
+    network: network.name,
+    factory: factoryAddress,
+    snapshotBlock: maxBlock,
+    snapshotTimestamp: genesisTimestamp + maxBlock * BLOCK_TIME_SEC,
+    totals: {
+      total,
+      nativeV3,
+      upgradedV1ToV3,
+      stillV1,
+      other,
+      v3AdoptionPercent: total > 0 ? ((nativeV3 + upgradedV1ToV3) * 100) / total : 0,
+    },
+    monthly: monthlyWithCumulative,
+    stillV1Treasury: treasury,
+  };
+
+  fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
+  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(insights, null, 2));
+
+  console.log(`Wrote ${OUTPUT_PATH}`);
+  console.log(`\nSummary:`);
+  console.log(`  Total accounts:      ${total}`);
+  console.log(`  Native V3:           ${nativeV3}`);
+  console.log(`  Upgraded V1 → V3:    ${upgradedV1ToV3}`);
+  console.log(`  Still V1:            ${stillV1}`);
+  console.log(`  V3 adoption:         ${insights.totals.v3AdoptionPercent.toFixed(2)}%`);
+  console.log(`  Months in series:    ${monthlyWithCumulative.length}`);
+  if (treasury) {
+    console.log(`  Still-V1 treasury accounts counted: ${treasury.accounts}`);
+  }
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

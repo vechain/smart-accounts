@@ -1,0 +1,172 @@
+{
+  "generatedAt": "2026-05-21T09:35:42.014Z",
+  "network": "vechain_mainnet",
+  "factory": "0xC06Ad8573022e2BE416CA89DA47E8c592971679A",
+  "snapshotBlock": 24873603,
+  "snapshotTimestamp": 1779052830,
+  "totals": {
+    "total": 588699,
+    "nativeV3": 437419,
+    "upgradedV1ToV3": 5215,
+    "stillV1": 146065,
+    "other": 0,
+    "v3AdoptionPercent": 75.18850889843536
+  },
+  "monthly": [
+    {
+      "month": "2024-08",
+      "total": 216,
+      "v3Originated": 0,
+      "v1Originated": 216,
+      "cumulative": 216
+    },
+    {
+      "month": "2024-09",
+      "total": 1565,
+      "v3Originated": 0,
+      "v1Originated": 1565,
+      "cumulative": 1781
+    },
+    {
+      "month": "2024-10",
+      "total": 861,
+      "v3Originated": 0,
+      "v1Originated": 861,
+      "cumulative": 2642
+    },
+    {
+      "month": "2024-11",
+      "total": 344,
+      "v3Originated": 0,
+      "v1Originated": 344,
+      "cumulative": 2986
+    },
+    {
+      "month": "2024-12",
+      "total": 5392,
+      "v3Originated": 0,
+      "v1Originated": 5392,
+      "cumulative": 8378
+    },
+    {
+      "month": "2025-01",
+      "total": 31978,
+      "v3Originated": 0,
+      "v1Originated": 31978,
+      "cumulative": 40356
+    },
+    {
+      "month": "2025-02",
+      "total": 70495,
+      "v3Originated": 0,
+      "v1Originated": 70495,
+      "cumulative": 110851
+    },
+    {
+      "month": "2025-03",
+      "total": 96718,
+      "v3Originated": 56930,
+      "v1Originated": 39788,
+      "cumulative": 207569
+    },
+    {
+      "month": "2025-04",
+      "total": 34000,
+      "v3Originated": 33691,
+      "v1Originated": 309,
+      "cumulative": 241569
+    },
+    {
+      "month": "2025-05",
+      "total": 18969,
+      "v3Originated": 18923,
+      "v1Originated": 46,
+      "cumulative": 260538
+    },
+    {
+      "month": "2025-06",
+      "total": 129176,
+      "v3Originated": 129151,
+      "v1Originated": 25,
+      "cumulative": 389714
+    },
+    {
+      "month": "2025-07",
+      "total": 69538,
+      "v3Originated": 69482,
+      "v1Originated": 56,
+      "cumulative": 459252
+    },
+    {
+      "month": "2025-08",
+      "total": 44032,
+      "v3Originated": 43946,
+      "v1Originated": 86,
+      "cumulative": 503284
+    },
+    {
+      "month": "2025-09",
+      "total": 41435,
+      "v3Originated": 41382,
+      "v1Originated": 53,
+      "cumulative": 544719
+    },
+    {
+      "month": "2025-10",
+      "total": 26493,
+      "v3Originated": 26462,
+      "v1Originated": 31,
+      "cumulative": 571212
+    },
+    {
+      "month": "2025-11",
+      "total": 10712,
+      "v3Originated": 10701,
+      "v1Originated": 11,
+      "cumulative": 581924
+    },
+    {
+      "month": "2025-12",
+      "total": 1737,
+      "v3Originated": 1731,
+      "v1Originated": 6,
+      "cumulative": 583661
+    },
+    {
+      "month": "2026-01",
+      "total": 1931,
+      "v3Originated": 1923,
+      "v1Originated": 8,
+      "cumulative": 585592
+    },
+    {
+      "month": "2026-02",
+      "total": 936,
+      "v3Originated": 931,
+      "v1Originated": 5,
+      "cumulative": 586528
+    },
+    {
+      "month": "2026-03",
+      "total": 1090,
+      "v3Originated": 1085,
+      "v1Originated": 5,
+      "cumulative": 587618
+    },
+    {
+      "month": "2026-04",
+      "total": 721,
+      "v3Originated": 721,
+      "v1Originated": 0,
+      "cumulative": 588339
+    },
+    {
+      "month": "2026-05",
+      "total": 360,
+      "v3Originated": 360,
+      "v1Originated": 0,
+      "cumulative": 588699
+    }
+  ],
+  "stillV1Treasury": null
+}

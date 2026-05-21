@@ -30,7 +30,9 @@
     "contracts:analyze:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts analyze:account-versions:testnet",
     "contracts:analyze:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts analyze:account-versions:mainnet",
     "contracts:analyze-deep:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts analyze:account-versions-deep:testnet",
-    "contracts:analyze-deep:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts analyze:account-versions-deep:mainnet"
+    "contracts:analyze-deep:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts analyze:account-versions-deep:mainnet",
+    "contracts:export-insights:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts analyze:export-insights:testnet",
+    "contracts:export-insights:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts analyze:export-insights:mainnet"
   },
   "devDependencies": {
     "prettier": "^3.2.5",
