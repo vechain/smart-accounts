@@ -32,6 +32,8 @@ export default defineConfig(({ mode }) => {
         resolve(__dirname, "test/setup/resizeObserverMock.ts"),
       ],
     },
-    base: mode === "production" ? "/smart-accounts/" : "/",
+    // Production serves at the apex of smart-accounts.vechain.org (custom
+    // domain via CNAME), so paths live at root rather than under a project prefix.
+    base: "/",
   };
 });

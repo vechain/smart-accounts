@@ -24,7 +24,14 @@ if (!env) throw new Error("VITE_APP_ENV env variable must be set");
 
 const config = getConfig();
 const factoryAddress = config.simpleAccountFactoryContractAddress;
-const nodeUrl = config.nodeUrl;
+// Default to the vechain.energy node for analytics — higher throughput than
+// the public mainnet.vechain.org RPC under heavy event/balance scanning.
+// Override with THOR_NODE_URL if needed.
+const nodeUrl =
+  process.env.THOR_NODE_URL ??
+  (config.environment === "mainnet"
+    ? "https://node-mainnet.vechain.energy"
+    : config.nodeUrl);
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const ACCOUNT_CREATED_TOPIC = ethers.id(

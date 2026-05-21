@@ -4,8 +4,18 @@ name: Refresh insights
 # to main. The frontend fetches the JSON at runtime via the jsdelivr CDN so the
 # deployed site picks up new data without a rebuild.
 #
-# Pushes from the default GITHUB_TOKEN do NOT trigger other workflows, so this
-# job's commit will not re-trigger deploy.yml or unit-tests.yml.
+# Persistent on-chain state (events / versions / balances / rewards caches)
+# lives on the `insights-cache` orphan branch. It's seeded once locally so the
+# pipeline never has to do a cold full fetch from block 0.
+#
+# Daily flow:
+#   1. Restore .cache/ from insights-cache (git archive | tar -x).
+#   2. Run analytics pipeline incrementally.
+#   3. Force-push refreshed .cache/ back to insights-cache (rolling single commit).
+#   4. Commit the updated insights JSON to main.
+#
+# Pushes from the default GITHUB_TOKEN do NOT trigger other workflows, so the
+# commit on main will not re-trigger deploy.yml or unit-tests.yml.
 
 on:
   schedule:
@@ -19,18 +29,26 @@ concurrency:
   group: refresh-insights
   cancel-in-progress: false
 
+env:
+  CACHE_BRANCH: insights-cache
+  CACHE_DIR: packages/contracts/scripts/analytics/.cache
+  INSIGHTS_JSON: apps/frontend/src/data/insights-mainnet.json
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
     env:
       VITE_APP_ENV: mainnet
       # Hardhat needs a valid mnemonic to derive accounts for the vechain_mainnet
       # network config. The analytics scripts are read-only and never sign or
       # send transactions, so the standard hardhat test mnemonic is safe here.
       MNEMONIC: "test test test test test test test test test test test junk"
+      # vechain.energy gives us higher throughput / fewer drops than the
+      # public mainnet.vechain.org RPC during heavy event + balance scans.
+      THOR_NODE_URL: https://node-mainnet.vechain.energy
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup Node
@@ -39,13 +57,23 @@ jobs:
           node-version-file: .nvmrc
           cache: yarn
 
-      - name: Restore analytics cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: packages/contracts/scripts/analytics/.cache
-          key: analytics-cache-mainnet-${{ github.run_id }}
-          restore-keys: |
-            analytics-cache-mainnet-
+      - name: Restore analytics cache from insights-cache branch
+        env:
+          BRANCH: ${{ env.CACHE_BRANCH }}
+          DIR: ${{ env.CACHE_DIR }}
+        run: |
+          mkdir -p "$DIR"
+          if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null 2>&1; then
+            git fetch --depth 1 origin "$BRANCH":"$BRANCH"
+            # Stream the cache files out of the branch without switching HEAD.
+            git archive "$BRANCH" | tar -x
+            echo "Restored cache from $BRANCH:"
+            ls -la "$DIR" || true
+          else
+            echo "::warning::Cache branch '$BRANCH' does not exist."
+            echo "Run 'yarn contracts:analyze-deep:mainnet && yarn contracts:analyze-rewards:mainnet' locally,"
+            echo "then push $DIR contents to the '$BRANCH' branch to skip cold start."
+          fi
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -58,16 +86,49 @@ jobs:
           yarn contracts:analyze-rewards:mainnet
           yarn contracts:export-insights:mainnet
 
-      - name: Commit and push if insights changed
+      - name: Push refreshed cache to insights-cache branch
         env:
-          INSIGHTS_PATH: apps/frontend/src/data/insights-mainnet.json
+          BRANCH: ${{ env.CACHE_BRANCH }}
+          DIR: ${{ env.CACHE_DIR }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- "$INSIGHTS_PATH"; then
-            echo "No insights changes; skipping commit."
+
+          # Build the cache-branch state in an isolated worktree so the main
+          # checkout (and the freshly written insights JSON) stays untouched.
+          WT=$(mktemp -d)
+          git worktree add --detach "$WT"
+          # Wipe everything except .git so the orphan commit is clean.
+          find "$WT" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+          mkdir -p "$WT/$DIR"
+          cp -R "$DIR"/. "$WT/$DIR"/
+
+          (
+            cd "$WT"
+            git checkout --orphan rolling
+            git add -f "$DIR"
+            if git diff --cached --quiet; then
+              echo "No cache changes; skipping push."
+            else
+              git commit -m "chore(insights-cache): refresh $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              # Single rolling commit, no history bloat.
+              git push --force origin "rolling:$BRANCH"
+            fi
+          )
+
+          git worktree remove --force "$WT"
+
+      - name: Commit insights JSON to main
+        env:
+          JSON: ${{ env.INSIGHTS_JSON }}
+          DIR: ${{ env.CACHE_DIR }}
+        run: |
+          # The .cache directory is gitignored on main, so it won't appear in
+          # the diff. Only the JSON should change.
+          if git diff --quiet -- "$JSON"; then
+            echo "No insights changes; nothing to commit."
             exit 0
           fi
-          git add "$INSIGHTS_PATH"
+          git add "$JSON"
           git commit -m "chore(insights): refresh on-chain analytics snapshot"
-          git push
+          git push origin main

@@ -16,7 +16,13 @@ if (!env) throw new Error("VITE_APP_ENV env variable must be set");
 
 const config = getConfig();
 const factoryAddress = config.simpleAccountFactoryContractAddress;
-const nodeUrl = config.nodeUrl;
+// Default to the vechain.energy node — higher throughput than the public RPC.
+// Override with THOR_NODE_URL if needed.
+const nodeUrl =
+  process.env.THOR_NODE_URL ??
+  (config.environment === "mainnet"
+    ? "https://node-mainnet.vechain.energy"
+    : config.nodeUrl);
 
 // VeBetterDAO mainnet contract addresses. Override via env if needed.
 const REWARDS_POOL =

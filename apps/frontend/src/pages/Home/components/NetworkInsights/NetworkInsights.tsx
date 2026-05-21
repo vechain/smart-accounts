@@ -96,7 +96,7 @@ const formatBucketLabel = (key: string, g: Granularity): string => {
 
 export const NetworkInsights = () => {
   const { data } = useInsights("mainnet");
-  const [period, setPeriod] = useState<Period>("All");
+  const [period, setPeriod] = useState<Period>("3M");
 
   const [graphV3, graphUpgraded, graphV1, graphGrid, graphAxis] = useToken(
     "colors",
