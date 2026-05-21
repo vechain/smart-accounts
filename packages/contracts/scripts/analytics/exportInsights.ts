@@ -84,9 +84,28 @@ function computeCreate2Address(salt: bigint, initCodeHash: string): string {
   return ethers.getCreate2Address(factoryAddress, saltBytes32, initCodeHash);
 }
 
-function blockToMonth(blockNumber: number): string {
-  const ts = (genesisTimestamp + blockNumber * BLOCK_TIME_SEC) * 1000;
-  const d = new Date(ts);
+function blockToDate(blockNumber: number): Date {
+  return new Date((genesisTimestamp + blockNumber * BLOCK_TIME_SEC) * 1000);
+}
+
+function isoDay(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = (d.getUTCMonth() + 1).toString().padStart(2, "0");
+  const day = d.getUTCDate().toString().padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Week bucket = the Monday (UTC) of the ISO week containing the date.
+function isoWeekStart(d: Date): string {
+  const date = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  );
+  const dayOfWeek = date.getUTCDay() || 7; // Sunday -> 7
+  if (dayOfWeek !== 1) date.setUTCDate(date.getUTCDate() - (dayOfWeek - 1));
+  return isoDay(date);
+}
+
+function isoMonth(d: Date): string {
   const y = d.getUTCFullYear();
   const m = (d.getUTCMonth() + 1).toString().padStart(2, "0");
   return `${y}-${m}`;
@@ -187,31 +206,73 @@ async function main() {
     }
   }
 
-  // Monthly creations.
-  type MonthBucket = {
-    month: string;
+  // Build daily / weekly / monthly buckets in one pass.
+  type Bucket = {
+    key: string;
     total: number;
     v3Originated: number;
     v1Originated: number;
   };
-  const monthMap = new Map<string, MonthBucket>();
-  // unique is keyed by address — for monthly creations we use the first deploy block.
+  const newBucket = (key: string): Bucket => ({
+    key,
+    total: 0,
+    v3Originated: 0,
+    v1Originated: 0,
+  });
+
+  const dailyMap = new Map<string, Bucket>();
+  const weeklyMap = new Map<string, Bucket>();
+  const monthlyMap = new Map<string, Bucket>();
+
   for (const c of unique) {
-    const month = blockToMonth(c.blockNumber);
-    let m = monthMap.get(month);
-    if (!m) {
-      m = { month, total: 0, v3Originated: 0, v1Originated: 0 };
-      monthMap.set(month, m);
+    const d = blockToDate(c.blockNumber);
+    const dKey = isoDay(d);
+    const wKey = isoWeekStart(d);
+    const mKey = isoMonth(d);
+    for (const [map, key] of [
+      [dailyMap, dKey],
+      [weeklyMap, wKey],
+      [monthlyMap, mKey],
+    ] as const) {
+      let b = map.get(key);
+      if (!b) {
+        b = newBucket(key);
+        map.set(key, b);
+      }
+      b.total += 1;
+      if (c.originalImpl === "V3") b.v3Originated += 1;
+      else b.v1Originated += 1;
     }
-    m.total += 1;
-    if (c.originalImpl === "V3") m.v3Originated += 1;
-    else m.v1Originated += 1;
   }
 
-  const monthly = [...monthMap.values()].sort((a, b) =>
-    a.month < b.month ? -1 : 1
-  );
-  // Cumulative total.
+  const sortByKey = (a: Bucket, b: Bucket) => (a.key < b.key ? -1 : 1);
+  const fillDailyGaps = (rows: Bucket[]): Bucket[] => {
+    if (rows.length === 0) return rows;
+    const start = new Date(rows[0].key + "T00:00:00Z");
+    const end = new Date(rows[rows.length - 1].key + "T00:00:00Z");
+    const out: Bucket[] = [];
+    const idx = new Map(rows.map((r) => [r.key, r]));
+    for (
+      let cur = new Date(start);
+      cur <= end;
+      cur.setUTCDate(cur.getUTCDate() + 1)
+    ) {
+      const k = isoDay(cur);
+      out.push(idx.get(k) ?? newBucket(k));
+    }
+    return out;
+  };
+
+  const dailyFull = fillDailyGaps([...dailyMap.values()].sort(sortByKey));
+  const weeklyFull = [...weeklyMap.values()].sort(sortByKey);
+  const monthly = [...monthlyMap.values()].sort(sortByKey);
+
+  // Trim daily to last 60 days (covers 1M with breathing room) and weekly to
+  // the last 26 weeks (~6 months, covers 3M nicely).
+  const daily = dailyFull.slice(-60);
+  const weekly = weeklyFull.slice(-26);
+
+  // Cumulative total on monthly only (used for "All" view headlines).
   let running = 0;
   const monthlyWithCumulative = monthly.map((m) => {
     running += m.total;
@@ -284,7 +345,11 @@ async function main() {
       other,
       v3AdoptionPercent: total > 0 ? ((nativeV3 + upgradedV1ToV3) * 100) / total : 0,
     },
-    monthly: monthlyWithCumulative,
+    series: {
+      daily,
+      weekly,
+      monthly: monthlyWithCumulative,
+    },
     stillV1Treasury: treasury,
   };
 
@@ -298,7 +363,7 @@ async function main() {
   console.log(`  Upgraded V1 → V3:    ${upgradedV1ToV3}`);
   console.log(`  Still V1:            ${stillV1}`);
   console.log(`  V3 adoption:         ${insights.totals.v3AdoptionPercent.toFixed(2)}%`);
-  console.log(`  Months in series:    ${monthlyWithCumulative.length}`);
+  console.log(`  Series:              ${daily.length} days, ${weekly.length} weeks, ${monthlyWithCumulative.length} months`);
   if (treasury) {
     console.log(`  Still-V1 treasury accounts counted: ${treasury.accounts}`);
   }

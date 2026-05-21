@@ -27,9 +27,7 @@ import {
 } from "recharts";
 import { SectionHeading } from "../../../../components";
 import { useColorModeValue } from "../../../../components/ui/color-mode";
-import insightsData from "../../../../data/insights-mainnet.json";
-
-type Insights = typeof insightsData;
+import { useInsights } from "../../../../hooks/useInsights";
 
 const compactFormatter = new Intl.NumberFormat("en-US", {
   notation: "compact",
@@ -50,15 +48,55 @@ const formatToken = (wei: string, decimals = 18, fractionDigits = 2): string => 
 };
 
 type Period = "1M" | "3M" | "1Y" | "All";
-const PERIOD_MONTHS: Record<Period, number | null> = {
-  "1M": 1,
-  "3M": 3,
-  "1Y": 12,
-  All: null,
+type Granularity = "daily" | "weekly" | "monthly";
+
+const PERIOD_CONFIG: Record<
+  Period,
+  { granularity: Granularity; take: number | null; description: string }
+> = {
+  "1M": { granularity: "daily", take: 30, description: "Daily, last 30 days" },
+  "3M": { granularity: "weekly", take: 13, description: "Weekly, last 13 weeks" },
+  "1Y": { granularity: "monthly", take: 12, description: "Monthly, last 12 months" },
+  All: { granularity: "monthly", take: null, description: "Monthly, full history" },
+};
+
+const SHORT_MONTH = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const formatTick = (key: string, g: Granularity): string => {
+  if (g === "monthly") {
+    const [y, m] = key.split("-");
+    return `${SHORT_MONTH[parseInt(m, 10) - 1]} ${y.slice(2)}`;
+  }
+  // daily / weekly: YYYY-MM-DD
+  const [, m, d] = key.split("-");
+  return `${SHORT_MONTH[parseInt(m, 10) - 1]} ${parseInt(d, 10)}`;
+};
+
+const formatBucketLabel = (key: string, g: Granularity): string => {
+  if (g === "monthly") {
+    const [y, m] = key.split("-");
+    return `${SHORT_MONTH[parseInt(m, 10) - 1]} ${y}`;
+  }
+  const [y, m, d] = key.split("-");
+  const base = `${SHORT_MONTH[parseInt(m, 10) - 1]} ${parseInt(d, 10)}, ${y}`;
+  return g === "weekly" ? `Week of ${base}` : base;
 };
 
 export const NetworkInsights = () => {
-  const data = insightsData as Insights;
+  const { data } = useInsights("mainnet");
   const [period, setPeriod] = useState<Period>("All");
 
   const [graphV3, graphUpgraded, graphV1, graphGrid, graphAxis] = useToken(
@@ -89,10 +127,16 @@ export const NetworkInsights = () => {
     { name: "Still V1", value: data.totals.stillV1, color: graphV1 },
   ].filter((d) => d.value > 0);
 
-  const periodMonths = useMemo(() => {
-    const limit = PERIOD_MONTHS[period];
-    return limit == null ? data.monthly : data.monthly.slice(-limit);
-  }, [period, data.monthly]);
+  const { chartData, granularity, chartDescription } = useMemo(() => {
+    const cfg = PERIOD_CONFIG[period];
+    const series = data.series[cfg.granularity];
+    const rows = cfg.take == null ? series : series.slice(-cfg.take);
+    return {
+      chartData: rows,
+      granularity: cfg.granularity,
+      chartDescription: cfg.description,
+    };
+  }, [period, data.series]);
 
   const generatedDate = new Date(data.generatedAt).toLocaleDateString(
     undefined,
@@ -197,9 +241,14 @@ export const NetworkInsights = () => {
                 flexDir={{ base: "column", md: "row" }}
                 gap={3}
               >
-                <Heading size="sm" letterSpacing="-0.02em">
-                  Accounts created per month
-                </Heading>
+                <VStack align="flex-start" gap={0.5}>
+                  <Heading size="sm" letterSpacing="-0.02em">
+                    Accounts created
+                  </Heading>
+                  <Text textStyle="xs" color="text.subtle">
+                    {chartDescription}
+                  </Text>
+                </VStack>
                 <SegmentGroup.Root
                   size="sm"
                   value={period}
@@ -218,7 +267,7 @@ export const NetworkInsights = () => {
               <Box flex={1} minH="240px">
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart
-                    data={periodMonths}
+                    data={chartData}
                     margin={{ top: 8, right: 8, left: -10, bottom: 0 }}
                   >
                     <CartesianGrid
@@ -227,22 +276,35 @@ export const NetworkInsights = () => {
                       vertical={false}
                     />
                     <XAxis
-                      dataKey="month"
+                      dataKey="key"
                       tick={{ fill: graphAxis, fontSize: 11 }}
                       axisLine={false}
                       tickLine={false}
+                      interval="preserveStartEnd"
+                      minTickGap={
+                        granularity === "daily"
+                          ? 24
+                          : granularity === "weekly"
+                            ? 12
+                            : 0
+                      }
+                      tickFormatter={(k: string) => formatTick(k, granularity)}
                     />
                     <YAxis
                       tick={{ fill: graphAxis, fontSize: 11 }}
                       tickFormatter={(v: number) => formatCompact(v)}
                       axisLine={false}
                       tickLine={false}
+                      allowDecimals={false}
                     />
                     <Tooltip
                       contentStyle={tooltipContentStyle}
                       itemStyle={tooltipItemStyle}
                       labelStyle={tooltipLabelStyle}
                       cursor={{ fill: graphGrid }}
+                      labelFormatter={(k: string) =>
+                        formatBucketLabel(k, granularity)
+                      }
                       formatter={(v: number, name: string) => [
                         formatCount(v),
                         name === "v3Originated"

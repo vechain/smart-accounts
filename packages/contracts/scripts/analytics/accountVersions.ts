@@ -136,14 +136,17 @@ async function fetchAccountCreatedEvents(
   return out;
 }
 
-async function fetchAllEvents(latestBlock: number): Promise<EventEntry[]> {
+async function fetchAllEvents(
+  latestBlock: number,
+  fromBlock = 0
+): Promise<EventEntry[]> {
   const all: EventEntry[] = [];
-  for (let from = 0; from <= latestBlock; from += LOG_BLOCK_CHUNK) {
+  for (let from = fromBlock; from <= latestBlock; from += LOG_BLOCK_CHUNK) {
     const to = Math.min(from + LOG_BLOCK_CHUNK - 1, latestBlock);
     const chunk = await fetchAccountCreatedEvents(from, to);
     for (const ev of chunk) all.push(ev);
     process.stdout.write(
-      `\rFetched ${all.length} AccountCreated events (blocks 0..${to}/${latestBlock})...`
+      `\rFetched ${all.length} AccountCreated events (blocks ${fromBlock}..${to}/${latestBlock})...`
     );
   }
   process.stdout.write("\n");
@@ -259,10 +262,30 @@ async function main() {
 
   let events = loadEventsCache();
   if (events) {
-    console.log(
-      `Loaded ${events.length} AccountCreated events from cache (${EVENTS_CACHE_PATH}).`
+    const cachedMax = events.reduce(
+      (m, e) => (e.blockNumber > m ? e.blockNumber : m),
+      0
     );
-    console.log(`Set REFRESH_EVENTS=1 to force a refetch.\n`);
+    console.log(
+      `Loaded ${events.length} AccountCreated events from cache (max block ${cachedMax}).`
+    );
+    if (cachedMax < latestBlock) {
+      console.log(
+        `Fetching incremental events from block ${cachedMax + 1} to ${latestBlock}...`
+      );
+      const fresh = await fetchAllEvents(latestBlock, cachedMax + 1);
+      if (fresh.length > 0) {
+        for (const ev of fresh) events.push(ev);
+        saveEventsCache(events);
+        console.log(
+          `Appended ${fresh.length} new events (total ${events.length}).\n`
+        );
+      } else {
+        console.log("No new events.\n");
+      }
+    } else {
+      console.log(`Cache up to date with latest block.\n`);
+    }
   } else {
     console.log("Fetching AccountCreated events...");
     events = await fetchAllEvents(latestBlock);

@@ -67,3 +67,5 @@ packages/contracts/coverage/
 packages/contracts/coverage.json
 
 packages/contracts/scripts/analytics/.cache/
+
+.claude/

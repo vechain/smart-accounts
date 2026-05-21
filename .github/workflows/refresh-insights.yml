@@ -1,0 +1,72 @@
+name: Refresh insights
+
+# Re-runs the on-chain analytics pipeline and commits the updated insights JSON
+# to main. The frontend fetches the JSON at runtime via the jsdelivr CDN so the
+# deployed site picks up new data without a rebuild.
+#
+# Pushes from the default GITHUB_TOKEN do NOT trigger other workflows, so this
+# job's commit will not re-trigger deploy.yml or unit-tests.yml.
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # daily 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-insights
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      VITE_APP_ENV: mainnet
+      # Hardhat needs a valid mnemonic to derive accounts for the vechain_mainnet
+      # network config. The analytics scripts are read-only and never sign or
+      # send transactions, so the standard hardhat test mnemonic is safe here.
+      MNEMONIC: "test test test test test test test test test test test junk"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Restore analytics cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: packages/contracts/scripts/analytics/.cache
+          key: analytics-cache-mainnet-${{ github.run_id }}
+          restore-keys: |
+            analytics-cache-mainnet-
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run analytics pipeline
+        env:
+          NODE_OPTIONS: "--max-old-space-size=6144"
+        run: |
+          yarn contracts:analyze-deep:mainnet
+          yarn contracts:export-insights:mainnet
+
+      - name: Commit and push if insights changed
+        env:
+          INSIGHTS_PATH: apps/frontend/src/data/insights-mainnet.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- "$INSIGHTS_PATH"; then
+            echo "No insights changes; skipping commit."
+            exit 0
+          fi
+          git add "$INSIGHTS_PATH"
+          git commit -m "chore(insights): refresh on-chain analytics snapshot"
+          git push
