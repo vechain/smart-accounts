@@ -25,7 +25,11 @@ export const AbstractedAccounts = () => {
       />
 
       {!connectedWallet ? (
-        <Card.Root variant="glow">
+        <Card.Root
+          borderColor="border.brand"
+          boxShadow="glow"
+          bg="bg.surface.raised"
+        >
           <Card.Body p={{ base: 8, md: 12 }}>
             <VStack gap={5} textAlign="center">
               <Box

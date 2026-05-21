@@ -99,7 +99,7 @@ export const getInsightsQueryKey = (env: "mainnet" | "testnet") => [
 ];
 
 export const useInsights = (env: "mainnet" | "testnet" = "mainnet") =>
-  useQuery({
+  useQuery<Insights>({
     queryKey: getInsightsQueryKey(env),
     queryFn: () => fetchInsights(env),
     initialData: fallback[env],
