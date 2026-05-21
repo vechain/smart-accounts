@@ -6,7 +6,6 @@ import {
   SegmentGroup,
   SimpleGrid,
   Separator,
-  Stack,
   Text,
   useToken,
   VStack,
@@ -333,79 +332,216 @@ export const NetworkInsights = () => {
         </Card.Root>
       </SimpleGrid>
 
-      {data.stillV1Treasury && (
-        <Card.Root>
-          <Card.Body p={6}>
-            <VStack align="stretch" gap={5}>
-              <HStack justify="space-between" align="baseline">
+      {data.treasury && (
+        <>
+          <Card.Root>
+            <Card.Body p={6}>
+              <VStack align="stretch" gap={5}>
+                <HStack justify="space-between" align="baseline">
+                  <Heading size="sm" letterSpacing="-0.02em">
+                    Fleet treasury
+                  </Heading>
+                  <Text textStyle="xs" color="text.subtle">
+                    Across {formatCount(data.treasury.accountsCounted)} accounts
+                  </Text>
+                </HStack>
+
+                <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
+                  {(["b3tr", "vot3", "vet", "vtho"] as const).map((k) => (
+                    <TreasuryStat
+                      key={k}
+                      label={k.toUpperCase()}
+                      total={formatToken(data.treasury!.fleet.totals[k])}
+                      holders={data.treasury!.fleet.holders[k]}
+                    />
+                  ))}
+                </SimpleGrid>
+
+                <Separator borderColor="border.subtle" />
+
+                <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+                  {(
+                    [
+                      { key: "nativeV3", label: "Native V3", color: graphV3 },
+                      {
+                        key: "upgradedV1ToV3",
+                        label: "Upgraded V1 → V3",
+                        color: graphUpgraded,
+                      },
+                      { key: "stillV1", label: "Still V1", color: graphV1 },
+                    ] as const
+                  ).map(({ key, label, color }) => {
+                    const v = data.treasury!.byVersion[key];
+                    return (
+                      <VStack key={key} align="stretch" gap={2}>
+                        <HStack gap={2}>
+                          <Box boxSize="8px" rounded="full" bg={color} />
+                          <Text
+                            textStyle="xs"
+                            textTransform="uppercase"
+                            letterSpacing="0.1em"
+                            color="text.subtle"
+                            fontWeight={600}
+                          >
+                            {label}
+                          </Text>
+                        </HStack>
+                        <Text textStyle="sm" color="text.muted">
+                          B3TR{" "}
+                          <Text
+                            as="span"
+                            color="text.primary"
+                            fontFamily="mono"
+                            fontWeight={600}
+                          >
+                            {formatToken(v.totals.b3tr)}
+                          </Text>
+                        </Text>
+                        <Text textStyle="sm" color="text.muted">
+                          VOT3{" "}
+                          <Text
+                            as="span"
+                            color="text.primary"
+                            fontFamily="mono"
+                            fontWeight={600}
+                          >
+                            {formatToken(v.totals.vot3)}
+                          </Text>
+                        </Text>
+                        <Text textStyle="sm" color="text.muted">
+                          VET{" "}
+                          <Text
+                            as="span"
+                            color="text.primary"
+                            fontFamily="mono"
+                            fontWeight={600}
+                          >
+                            {formatToken(v.totals.vet)}
+                          </Text>
+                        </Text>
+                      </VStack>
+                    );
+                  })}
+                </SimpleGrid>
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+
+          <Card.Root>
+            <Card.Body p={6}>
+              <VStack align="stretch" gap={5}>
                 <Heading size="sm" letterSpacing="-0.02em">
-                  Assets stuck in V1 accounts
+                  Activity tiers
                 </Heading>
-                <Text textStyle="xs" color="text.subtle">
-                  {formatCount(data.stillV1Treasury.accounts)} accounts
+                <Text textStyle="xs" color="text.muted">
+                  Hot = ≥ 1 B3TR / VOT3 or ≥ 10 VET · Warm = any asset · Cold =
+                  empty
                 </Text>
-              </HStack>
 
-              <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
-                <TreasuryStat
-                  label="VET"
-                  total={formatToken(data.stillV1Treasury.totals.vet)}
-                  holders={data.stillV1Treasury.holders.vet}
-                />
-                <TreasuryStat
-                  label="B3TR"
-                  total={formatToken(data.stillV1Treasury.totals.b3tr)}
-                  holders={data.stillV1Treasury.holders.b3tr}
-                />
-                <TreasuryStat
-                  label="VOT3"
-                  total={formatToken(data.stillV1Treasury.totals.vot3)}
-                  holders={data.stillV1Treasury.holders.vot3}
-                />
-                <TreasuryStat
-                  label="VTHO"
-                  total={formatToken(data.stillV1Treasury.totals.vtho)}
-                  holders={data.stillV1Treasury.holders.vtho}
-                />
-              </SimpleGrid>
-
-              <Separator borderColor="border.subtle" />
-
-              <Stack direction={{ base: "column", sm: "row" }} gap={6}>
-                <Box>
-                  <Text textStyle="xs" color="text.subtle">
-                    With any asset
-                  </Text>
-                  <Text
-                    fontWeight={700}
-                    color="text.primary"
-                    fontFamily="mono"
-                    fontSize="lg"
-                  >
-                    {formatCount(data.stillV1Treasury.holders.any)}
-                  </Text>
-                </Box>
-                <Box>
-                  <Text textStyle="xs" color="text.subtle">
-                    Empty
-                  </Text>
-                  <Text
-                    fontWeight={700}
-                    color="text.primary"
-                    fontFamily="mono"
-                    fontSize="lg"
-                  >
-                    {formatCount(data.stillV1Treasury.holders.empty)}
-                  </Text>
-                </Box>
-              </Stack>
-            </VStack>
-          </Card.Body>
-        </Card.Root>
+                <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+                  {(
+                    [
+                      { key: "nativeV3", label: "Native V3" },
+                      { key: "upgradedV1ToV3", label: "Upgraded V1 → V3" },
+                      { key: "stillV1", label: "Still V1" },
+                    ] as const
+                  ).map(({ key, label }) => {
+                    const v = data.treasury!.byVersion[key];
+                    const total = v.tiers.hot + v.tiers.warm + v.tiers.cold;
+                    const pct = (n: number) =>
+                      total > 0 ? (n * 100) / total : 0;
+                    return (
+                      <VStack key={key} align="stretch" gap={3}>
+                        <HStack justify="space-between" align="baseline">
+                          <Text
+                            textStyle="xs"
+                            textTransform="uppercase"
+                            letterSpacing="0.1em"
+                            color="text.subtle"
+                            fontWeight={600}
+                          >
+                            {label}
+                          </Text>
+                          <Text textStyle="xs" color="text.subtle">
+                            {formatCount(total)}
+                          </Text>
+                        </HStack>
+                        <HStack
+                          h="8px"
+                          rounded="full"
+                          overflow="hidden"
+                          bg="bg.chip"
+                          gap={0}
+                        >
+                          <Box
+                            h="full"
+                            w={`${pct(v.tiers.hot)}%`}
+                            bg={graphV3}
+                          />
+                          <Box
+                            h="full"
+                            w={`${pct(v.tiers.warm)}%`}
+                            bg={graphUpgraded}
+                          />
+                          <Box
+                            h="full"
+                            w={`${pct(v.tiers.cold)}%`}
+                            bg="text.subtle"
+                            opacity={0.4}
+                          />
+                        </HStack>
+                        <HStack justify="space-between" textStyle="xs">
+                          <TierLabel
+                            dot={graphV3}
+                            label="Hot"
+                            value={v.tiers.hot}
+                          />
+                          <TierLabel
+                            dot={graphUpgraded}
+                            label="Warm"
+                            value={v.tiers.warm}
+                          />
+                          <TierLabel
+                            dot="text.subtle"
+                            label="Cold"
+                            value={v.tiers.cold}
+                            dim
+                          />
+                        </HStack>
+                      </VStack>
+                    );
+                  })}
+                </SimpleGrid>
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+        </>
       )}
     </VStack>
   );
 };
+
+const TierLabel = ({
+  dot,
+  label,
+  value,
+  dim,
+}: {
+  dot: string;
+  label: string;
+  value: number;
+  dim?: boolean;
+}) => (
+  <HStack gap={1.5}>
+    <Box boxSize="6px" rounded="full" bg={dot} opacity={dim ? 0.5 : 1} />
+    <Text color="text.muted">
+      {label}{" "}
+      <Text as="span" color="text.primary" fontFamily="mono" fontWeight={600}>
+        {value.toLocaleString()}
+      </Text>
+    </Text>
+  </HStack>
+);
 
 const StatCard = ({
   label,

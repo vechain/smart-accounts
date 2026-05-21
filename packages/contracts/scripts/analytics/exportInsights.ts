@@ -279,54 +279,130 @@ async function main() {
     return { ...m, cumulative: running };
   });
 
-  // Still V1 treasury.
+  // === Fleet treasury + activity tiers ===
+  const tokenKeys = ["vet", "b3tr", "vot3", "vtho"] as const;
+  type TokenKey = (typeof tokenKeys)[number];
+  type VersionKey = "nativeV3" | "upgradedV1ToV3" | "stillV1";
+  const versionKeys: VersionKey[] = ["nativeV3", "upgradedV1ToV3", "stillV1"];
+
+  // Activity-tier thresholds (in wei, 18-decimal tokens). Tweak if needed.
+  // "hot" — meaningful position: ≥1 B3TR or ≥1 VOT3 or ≥10 VET.
+  const ONE_TOKEN = 10n ** 18n;
+  const HOT_B3TR = ONE_TOKEN;
+  const HOT_VOT3 = ONE_TOKEN;
+  const HOT_VET = 10n * ONE_TOKEN;
+
+  const classify = (c: { address: string; originalImpl: "V1" | "V3" }): VersionKey => {
+    const v = versions[c.address] ?? null;
+    if (v === 3) return c.originalImpl === "V1" ? "upgradedV1ToV3" : "nativeV3";
+    return "stillV1";
+  };
+
+  const emptyTokenMap = () =>
+    Object.fromEntries(tokenKeys.map((k) => [k, 0n])) as Record<TokenKey, bigint>;
+  const emptyHolders = () =>
+    Object.fromEntries(tokenKeys.map((k) => [k, 0])) as Record<TokenKey, number>;
+
   let treasury:
     | {
-        accounts: number;
-        holders: { vet: number; b3tr: number; vot3: number; vtho: number; any: number; empty: number };
-        totals: { vet: string; b3tr: string; vot3: string; vtho: string };
+        accountsCounted: number;
+        fleet: { totals: Record<TokenKey, string>; holders: Record<TokenKey, number> };
+        byVersion: Record<
+          VersionKey,
+          {
+            accounts: number;
+            withBalance: number;
+            totals: Record<TokenKey, string>;
+            holders: Record<TokenKey, number>;
+            tiers: { hot: number; warm: number; cold: number };
+          }
+        >;
       }
     | null = null;
 
   if (Object.keys(balances).length > 0) {
-    let vetTotal = 0n;
-    let b3trTotal = 0n;
-    let vot3Total = 0n;
-    let vthoTotal = 0n;
-    const holders = { vet: 0, b3tr: 0, vot3: 0, vtho: 0, any: 0, empty: 0 };
-    let counted = 0;
+    const fleetTotals = emptyTokenMap();
+    const fleetHolders = emptyHolders();
+    const versionTotals: Record<VersionKey, Record<TokenKey, bigint>> = {
+      nativeV3: emptyTokenMap(),
+      upgradedV1ToV3: emptyTokenMap(),
+      stillV1: emptyTokenMap(),
+    };
+    const versionHolders: Record<VersionKey, Record<TokenKey, number>> = {
+      nativeV3: emptyHolders(),
+      upgradedV1ToV3: emptyHolders(),
+      stillV1: emptyHolders(),
+    };
+    const accountsByVersion: Record<VersionKey, number> = {
+      nativeV3: 0,
+      upgradedV1ToV3: 0,
+      stillV1: 0,
+    };
+    const withBalanceByVersion: Record<VersionKey, number> = {
+      nativeV3: 0,
+      upgradedV1ToV3: 0,
+      stillV1: 0,
+    };
+    const tiersByVersion: Record<VersionKey, { hot: number; warm: number; cold: number }> = {
+      nativeV3: { hot: 0, warm: 0, cold: 0 },
+      upgradedV1ToV3: { hot: 0, warm: 0, cold: 0 },
+      stillV1: { hot: 0, warm: 0, cold: 0 },
+    };
 
+    let counted = 0;
     for (const c of unique) {
-      if (c.originalImpl !== "V1") continue;
-      if (versions[c.address] !== null) continue; // only "still V1"
+      const bucket = classify(c);
+      accountsByVersion[bucket]++;
       const b = balances[c.address];
       if (!b) continue;
       counted++;
-      const vet = BigInt(b.vet);
-      const b3tr = BigInt(b.b3tr);
-      const vot3 = BigInt(b.vot3);
-      const vtho = BigInt(b.vtho);
-      vetTotal += vet;
-      b3trTotal += b3tr;
-      vot3Total += vot3;
-      vthoTotal += vtho;
-      let any = false;
-      if (vet > 0n) { holders.vet++; any = true; }
-      if (b3tr > 0n) { holders.b3tr++; any = true; }
-      if (vot3 > 0n) { holders.vot3++; any = true; }
-      if (vtho > 0n) { holders.vtho++; any = true; }
-      if (any) holders.any++; else holders.empty++;
+
+      const vals: Record<TokenKey, bigint> = {
+        vet: BigInt(b.vet),
+        b3tr: BigInt(b.b3tr),
+        vot3: BigInt(b.vot3),
+        vtho: BigInt(b.vtho),
+      };
+      let hasAny = false;
+      for (const k of tokenKeys) {
+        fleetTotals[k] += vals[k];
+        versionTotals[bucket][k] += vals[k];
+        if (vals[k] > 0n) {
+          fleetHolders[k]++;
+          versionHolders[bucket][k]++;
+          hasAny = true;
+        }
+      }
+      if (hasAny) withBalanceByVersion[bucket]++;
+
+      const isHot =
+        vals.b3tr >= HOT_B3TR || vals.vot3 >= HOT_VOT3 || vals.vet >= HOT_VET;
+      if (isHot) tiersByVersion[bucket].hot++;
+      else if (hasAny) tiersByVersion[bucket].warm++;
+      else tiersByVersion[bucket].cold++;
     }
 
+    const toStr = (m: Record<TokenKey, bigint>): Record<TokenKey, string> =>
+      Object.fromEntries(tokenKeys.map((k) => [k, m[k].toString()])) as Record<
+        TokenKey,
+        string
+      >;
+
     treasury = {
-      accounts: counted,
-      holders,
-      totals: {
-        vet: vetTotal.toString(),
-        b3tr: b3trTotal.toString(),
-        vot3: vot3Total.toString(),
-        vtho: vthoTotal.toString(),
-      },
+      accountsCounted: counted,
+      fleet: { totals: toStr(fleetTotals), holders: fleetHolders },
+      byVersion: Object.fromEntries(
+        versionKeys.map((v) => [
+          v,
+          {
+            accounts: accountsByVersion[v],
+            withBalance: withBalanceByVersion[v],
+            totals: toStr(versionTotals[v]),
+            holders: versionHolders[v],
+            tiers: tiersByVersion[v],
+          },
+        ])
+      ) as typeof treasury.byVersion,
     };
   }
 
@@ -350,7 +426,7 @@ async function main() {
       weekly,
       monthly: monthlyWithCumulative,
     },
-    stillV1Treasury: treasury,
+    treasury,
   };
 
   fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
@@ -365,7 +441,7 @@ async function main() {
   console.log(`  V3 adoption:         ${insights.totals.v3AdoptionPercent.toFixed(2)}%`);
   console.log(`  Series:              ${daily.length} days, ${weekly.length} weeks, ${monthlyWithCumulative.length} months`);
   if (treasury) {
-    console.log(`  Still-V1 treasury accounts counted: ${treasury.accounts}`);
+    console.log(`  Treasury counted:    ${treasury.accountsCounted} / ${total} accounts`);
   }
 }
 

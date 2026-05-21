@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-21T12:34:38.757Z",
+  "generatedAt": "2026-05-21T12:57:56.456Z",
   "network": "vechain_mainnet",
   "factory": "0xC06Ad8573022e2BE416CA89DA47E8c592971679A",
   "snapshotBlock": 24873603,
@@ -690,5 +690,5 @@
       }
     ]
   },
-  "stillV1Treasury": null
+  "treasury": null
 }

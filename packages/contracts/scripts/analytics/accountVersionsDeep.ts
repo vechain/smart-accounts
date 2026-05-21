@@ -592,110 +592,124 @@ async function main() {
     }
   }
 
-  // === Still V1: balances + activity ===
-  if (stillV1.length > 0) {
-    console.log(`\n--- Still V1 activity (${stillV1.length} accounts) ---`);
+  // === Fleet-wide balances ===
+  console.log(`\n--- Fleet balances (${unique.length} accounts) ---`);
 
-    const tokenList: { addr: string; label: keyof BalanceEntry }[] = [
-      { addr: b3trAddr, label: "b3tr" },
-      { addr: vot3Addr, label: "vot3" },
-      { addr: vthoAddr, label: "vtho" },
-    ];
-    const enabledTokens = tokenList.filter((t) => t.addr);
+  const tokenList: { addr: string; label: keyof BalanceEntry }[] = [
+    { addr: b3trAddr, label: "b3tr" },
+    { addr: vot3Addr, label: "vot3" },
+    { addr: vthoAddr, label: "vtho" },
+  ];
+  const enabledTokens = tokenList.filter((t) => t.addr);
 
-    let balancesMap = loadBalancesCache() ?? {};
-    const needBalances = stillV1.filter((c) => !(c.address in balancesMap));
+  let balancesMap = loadBalancesCache() ?? {};
+  const needBalances = unique.filter((c) => !(c.address in balancesMap));
 
-    if (needBalances.length > 0) {
-      console.log(
-        `Querying ERC20 balances for ${needBalances.length} accounts (rest from cache)...`
-      );
-      const balanceClauses: { to: string; data: string }[] = [];
-      for (const c of needBalances) {
-        for (const t of enabledTokens) {
-          balanceClauses.push({
-            to: t.addr,
-            data:
-              BALANCE_OF_SELECTOR +
-              ethers.zeroPadValue(c.address, 32).slice(2),
-          });
-        }
+  if (needBalances.length > 0) {
+    console.log(
+      `Querying ERC20 balances for ${needBalances.length} accounts (${
+        unique.length - needBalances.length
+      } from cache)...`
+    );
+    const balanceClauses: { to: string; data: string }[] = [];
+    for (const c of needBalances) {
+      for (const t of enabledTokens) {
+        balanceClauses.push({
+          to: t.addr,
+          data:
+            BALANCE_OF_SELECTOR +
+            ethers.zeroPadValue(c.address, 32).slice(2),
+        });
       }
-      const balanceResults = await batchSimulateClauses(
-        balanceClauses,
-        "balanceOf"
-      );
-
-      console.log(`Fetching VET balances for ${needBalances.length} accounts...`);
-      const infos = await fetchAccountInfos(
-        needBalances.map((c) => c.address),
-        "VET balance"
-      );
-
-      for (let i = 0; i < needBalances.length; i++) {
-        const entry: BalanceEntry = { vet: "0", vtho: "0", b3tr: "0", vot3: "0" };
-        for (let k = 0; k < enabledTokens.length; k++) {
-          const t = enabledTokens[k];
-          const r = balanceResults[i * enabledTokens.length + k];
-          entry[t.label] = (!r || r.reverted ? 0n : parseUint(r.data)).toString();
-        }
-        entry.vet = parseUint(infos[i]?.balance).toString();
-        balancesMap[needBalances[i].address] = entry;
-      }
-      saveBalancesCache(balancesMap);
-    } else {
-      console.log("Loaded balance results from cache.");
     }
+    const balanceResults = await batchSimulateClauses(
+      balanceClauses,
+      "balanceOf"
+    );
 
-    const tokenTotals: Record<string, bigint> = {
-      VET: 0n,
-      B3TR: 0n,
-      VOT3: 0n,
-      VTHO: 0n,
+    console.log(`Fetching VET balances for ${needBalances.length} accounts...`);
+    const infos = await fetchAccountInfos(
+      needBalances.map((c) => c.address),
+      "VET balance"
+    );
+
+    for (let i = 0; i < needBalances.length; i++) {
+      const entry: BalanceEntry = { vet: "0", vtho: "0", b3tr: "0", vot3: "0" };
+      for (let k = 0; k < enabledTokens.length; k++) {
+        const t = enabledTokens[k];
+        const r = balanceResults[i * enabledTokens.length + k];
+        entry[t.label] = (!r || r.reverted ? 0n : parseUint(r.data)).toString();
+      }
+      entry.vet = parseUint(infos[i]?.balance).toString();
+      balancesMap[needBalances[i].address] = entry;
+
+      // Periodic flush so a long run that crashes still saves progress.
+      if ((i + 1) % 10_000 === 0) saveBalancesCache(balancesMap);
+    }
+    saveBalancesCache(balancesMap);
+  } else {
+    console.log("All balances served from cache.");
+  }
+
+  // Aggregate fleet-wide totals + per-version split.
+  const tokenLabels = ["VET", "B3TR", "VOT3", "VTHO"] as const;
+  type TokenLabel = (typeof tokenLabels)[number];
+  type VersionKey = "nativeV3" | "upgradedV1ToV3" | "stillV1";
+  const empty = () =>
+    Object.fromEntries(tokenLabels.map((k) => [k, 0n])) as Record<TokenLabel, bigint>;
+  const totals: Record<VersionKey | "fleet", Record<TokenLabel, bigint>> = {
+    nativeV3: empty(),
+    upgradedV1ToV3: empty(),
+    stillV1: empty(),
+    fleet: empty(),
+  };
+  const holders: Record<VersionKey | "fleet", Record<TokenLabel | "any", number>> = {
+    nativeV3: { VET: 0, B3TR: 0, VOT3: 0, VTHO: 0, any: 0 },
+    upgradedV1ToV3: { VET: 0, B3TR: 0, VOT3: 0, VTHO: 0, any: 0 },
+    stillV1: { VET: 0, B3TR: 0, VOT3: 0, VTHO: 0, any: 0 },
+    fleet: { VET: 0, B3TR: 0, VOT3: 0, VTHO: 0, any: 0 },
+  };
+
+  const classify = (c: Classified): VersionKey => {
+    const v = versionMap![c.address];
+    if (v === 3) return c.originalImpl === "V1" ? "upgradedV1ToV3" : "nativeV3";
+    return "stillV1";
+  };
+
+  for (const c of unique) {
+    const b = balancesMap[c.address];
+    if (!b) continue;
+    const vals: Record<TokenLabel, bigint> = {
+      VET: BigInt(b.vet),
+      B3TR: BigInt(b.b3tr),
+      VOT3: BigInt(b.vot3),
+      VTHO: BigInt(b.vtho),
     };
-    const tokenHolders: Record<string, number> = {
-      VET: 0,
-      B3TR: 0,
-      VOT3: 0,
-      VTHO: 0,
-    };
-    let anyAssetHolders = 0;
-    let allEmpty = 0;
-
-    for (const c of stillV1) {
-      const b = balancesMap[c.address];
-      if (!b) continue;
-      const vals: Record<string, bigint> = {
-        VET: BigInt(b.vet),
-        B3TR: BigInt(b.b3tr),
-        VOT3: BigInt(b.vot3),
-        VTHO: BigInt(b.vtho),
-      };
-      let hasAny = false;
-      for (const k of Object.keys(vals)) {
-        tokenTotals[k] += vals[k];
-        if (vals[k] > 0n) {
-          tokenHolders[k]++;
-          hasAny = true;
-        }
+    const bucket = classify(c);
+    let hasAny = false;
+    for (const k of tokenLabels) {
+      totals[bucket][k] += vals[k];
+      totals.fleet[k] += vals[k];
+      if (vals[k] > 0n) {
+        holders[bucket][k]++;
+        holders.fleet[k]++;
+        hasAny = true;
       }
-      if (hasAny) anyAssetHolders++;
-      else allEmpty++;
     }
-
-    const labels = ["VET", "B3TR", "VOT3", "VTHO"];
-    console.log(`\n  Holders (balance > 0):`);
-    for (const k of labels) {
-      console.log(`    ${k.padEnd(6)} ${tokenHolders[k]}`);
-    }
-    console.log(`    Any:   ${anyAssetHolders}`);
-    console.log(`    Empty: ${allEmpty}`);
-
-    console.log(`\n  Total balances:`);
-    for (const k of labels) {
-      console.log(`    ${k.padEnd(6)} ${formatWei(tokenTotals[k])}`);
+    if (hasAny) {
+      holders[bucket].any++;
+      holders.fleet.any++;
     }
   }
+
+  console.log(`\n  Fleet totals:`);
+  for (const k of tokenLabels) {
+    console.log(`    ${k.padEnd(6)} ${formatWei(totals.fleet[k])}`);
+  }
+  console.log(`\n  Holders (any balance > 0):`);
+  console.log(`    Native V3:        ${holders.nativeV3.any}`);
+  console.log(`    Upgraded V1→V3:   ${holders.upgradedV1ToV3.any}`);
+  console.log(`    Still V1:         ${holders.stillV1.any}`);
 
   console.log("\nDone.\n");
 }
