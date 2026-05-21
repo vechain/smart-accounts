@@ -1,12 +1,6 @@
-import {
-  Box,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-  useColorModeValue,
-} from "@chakra-ui/react";
+import { Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { motion } from "framer-motion";
+import { useColorModeValue } from "../../../../components/ui/color-mode";
 
 const MotionBox = motion(Box);
 
@@ -23,9 +17,9 @@ export const Hero = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <VStack spacing={5} maxW="780px" mx="auto">
+        <VStack gap={5} maxW="780px" mx="auto">
           <HStack
-            spacing={2}
+            gap={2}
             px={3}
             py={1.5}
             rounded="full"
@@ -40,7 +34,7 @@ export const Hero = () => {
               boxShadow="0 0 8px rgba(19,229,197,0.8)"
             />
             <Text
-              fontSize="xs"
+              textStyle="xs"
               fontWeight={600}
               letterSpacing="0.08em"
               textTransform="uppercase"
@@ -59,7 +53,13 @@ export const Hero = () => {
             lineHeight="1.05"
           >
             Smart Accounts,
-            <Box as="span" display="block" bgGradient={gradient} bgClip="text">
+            <Box
+              as="span"
+              display="block"
+              bg={gradient}
+              bgClip="text"
+              color="transparent"
+            >
               made simple.
             </Box>
           </Heading>

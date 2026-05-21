@@ -1,11 +1,4 @@
-import {
-  Box,
-  Image,
-  Link,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Image, Link, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import CleanifyLogo from "../assets/cleanify.png";
 import MugshotLogo from "../assets/mugshot.png";
 import EVEarnLogo from "../assets/evearn.png";
@@ -29,7 +22,7 @@ export const SupportedProject = () => {
   ];
 
   return (
-    <VStack align="stretch" spacing={6}>
+    <VStack align="stretch" gap={6}>
       <SectionHeading
         eyebrow="Ecosystem"
         title="Supported by"
@@ -38,7 +31,7 @@ export const SupportedProject = () => {
 
       <SimpleGrid
         columns={{ base: 3, sm: 5 }}
-        spacing={{ base: 4, md: 6 }}
+        gap={{ base: 4, md: 6 }}
       >
         {projects.map((project) => (
           <SupportedProjectItem key={project.name} {...project} />
@@ -52,12 +45,15 @@ const SupportedProjectItem = ({ href, logo, name }: SupportedProjectProps) => {
   return (
     <Link
       href={href}
-      isExternal
+      target="_blank"
+      rel="noreferrer"
+      display="block"
+      w="full"
       _hover={{ textDecoration: "none" }}
       role="group"
     >
       <VStack
-        spacing={3}
+        gap={3}
         p={4}
         rounded="2xl"
         border="1px solid"
@@ -70,29 +66,17 @@ const SupportedProjectItem = ({ href, logo, name }: SupportedProjectProps) => {
           bg: "bg.surface.hover",
         }}
       >
-        <Box
+        <Image
+          src={logo}
+          alt={`${name} logo`}
           boxSize="64px"
-          rounded="2xl"
-          overflow="hidden"
-          bg="whiteAlpha.100"
-          _light={{ bg: "blackAlpha.50" }}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          p={2}
+          objectFit="contain"
+          rounded="xl"
           transition="transform 0.25s ease"
           _groupHover={{ transform: "scale(1.06)" }}
-        >
-          <Image
-            src={logo}
-            alt={`${name} logo`}
-            maxW="100%"
-            maxH="100%"
-            objectFit="contain"
-          />
-        </Box>
+        />
         <Text
-          fontSize="xs"
+          textStyle="xs"
           fontWeight={600}
           color="text.secondary"
           letterSpacing="-0.01em"

@@ -1,13 +1,11 @@
 import {
   Box,
   Card,
-  CardBody,
-  Divider,
   HStack,
   IconButton,
+  Separator,
   Skeleton,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import {
@@ -57,7 +55,7 @@ export const ContractInfo = ({ address, env }: ContractInfoProps) => {
   const totalCreated = accountsCreatedEvents?.totalCreated;
 
   return (
-    <Card
+    <Card.Root
       w="full"
       h="full"
       role="group"
@@ -67,26 +65,25 @@ export const ContractInfo = ({ address, env }: ContractInfoProps) => {
         borderColor: "border.brand",
       }}
     >
-      <CardBody p={6}>
-        <VStack align="stretch" spacing={6} h="full">
+      <Card.Body p={6}>
+        <VStack align="stretch" gap={6} h="full">
           <HStack justify="space-between" align="flex-start">
             <NetworkBadge env={env} />
-            <Tooltip label="Refresh" placement="top">
-              <IconButton
-                aria-label="Refresh"
-                icon={<FaSync />}
-                size="sm"
-                variant="ghost"
-                isLoading={isLoading}
-                onClick={refresh}
-                borderRadius="lg"
-              />
-            </Tooltip>
+            <IconButton
+              aria-label="Refresh"
+              size="sm"
+              variant="ghost"
+              loading={isLoading}
+              onClick={refresh}
+              borderRadius="lg"
+            >
+              <FaSync />
+            </IconButton>
           </HStack>
 
           <Box>
             <Text
-              fontSize="xs"
+              textStyle="xs"
               fontWeight={600}
               letterSpacing="0.12em"
               textTransform="uppercase"
@@ -96,14 +93,12 @@ export const ContractInfo = ({ address, env }: ContractInfoProps) => {
               Accounts Created
             </Text>
             <Skeleton
-              isLoaded={!isLoadingCreatedAccoounts}
-              startColor="whiteAlpha.100"
-              endColor="whiteAlpha.300"
+              loading={isLoadingCreatedAccoounts}
               borderRadius="lg"
               minH="56px"
               w={isLoadingCreatedAccoounts ? "60%" : "auto"}
             >
-              <HStack align="baseline" spacing={2}>
+              <HStack align="baseline" gap={2}>
                 <Text
                   fontSize={{ base: "4xl", md: "5xl" }}
                   fontWeight={800}
@@ -117,30 +112,29 @@ export const ContractInfo = ({ address, env }: ContractInfoProps) => {
             </Skeleton>
           </Box>
 
-          <Divider />
+          <Separator borderColor="border.subtle" />
 
-          <VStack align="stretch" spacing={3}>
+          <VStack align="stretch" gap={3}>
             <HStack justify="space-between">
-              <Text fontSize="sm" color="text.muted" fontWeight={500}>
+              <Text textStyle="sm" color="text.muted" fontWeight={500}>
                 Factory
               </Text>
               <AddressButtonGhostVariant address={address} />
             </HStack>
             <HStack justify="space-between">
-              <Text fontSize="sm" color="text.muted" fontWeight={500}>
+              <Text textStyle="sm" color="text.muted" fontWeight={500}>
                 Version
               </Text>
               <Box
                 px={2.5}
                 py={0.5}
                 rounded="md"
-                bg="whiteAlpha.100"
-                _light={{ bg: "blackAlpha.50" }}
+                bg="bg.chip"
                 border="1px solid"
                 borderColor="border.subtle"
               >
                 <Text
-                  fontSize="xs"
+                  textStyle="xs"
                   fontFamily="mono"
                   fontWeight={600}
                   color="text.secondary"
@@ -151,7 +145,7 @@ export const ContractInfo = ({ address, env }: ContractInfoProps) => {
             </HStack>
           </VStack>
 
-          <Text fontSize="xs" color="text.subtle" mt="auto">
+          <Text textStyle="xs" color="text.subtle" mt="auto">
             Updated{" "}
             {dataUpdatedAt
               ? new Date(dataUpdatedAt).toLocaleTimeString([], {
@@ -161,7 +155,7 @@ export const ContractInfo = ({ address, env }: ContractInfoProps) => {
               : "—"}
           </Text>
         </VStack>
-      </CardBody>
-    </Card>
+      </Card.Body>
+    </Card.Root>
   );
 };

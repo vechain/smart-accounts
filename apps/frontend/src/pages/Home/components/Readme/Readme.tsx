@@ -1,14 +1,11 @@
 import {
   Box,
   Card,
-  CardBody,
-  Divider,
   Heading,
   HStack,
-  Icon,
   Link,
   List,
-  ListItem,
+  Separator,
   SimpleGrid,
   Text,
   VStack,
@@ -17,22 +14,16 @@ import { FaBolt, FaGithub } from "react-icons/fa";
 import { NetworkBadge, SectionHeading } from "../../../../components";
 
 const BulletText = ({ children }: { children: React.ReactNode }) => (
-  <Text fontSize="sm" color="text.secondary" lineHeight="1.7">
+  <Text textStyle="sm" color="text.secondary" lineHeight="1.7">
     {children}
   </Text>
 );
 
 const Bullet = ({ children }: { children: React.ReactNode }) => (
-  <ListItem display="flex" gap={3} alignItems="flex-start">
-    <Box
-      mt="9px"
-      boxSize="5px"
-      rounded="full"
-      bg="brand.400"
-      flexShrink={0}
-    />
+  <List.Item display="flex" gap={3} alignItems="flex-start">
+    <Box mt="9px" boxSize="5px" rounded="full" bg="brand.400" flexShrink={0} />
     <Box>{children}</Box>
-  </ListItem>
+  </List.Item>
 );
 
 const DeployedNetwork = ({
@@ -44,15 +35,16 @@ const DeployedNetwork = ({
   address: string;
   href: string;
 }) => (
-  <Card variant="outline" w="full">
-    <CardBody p={5}>
-      <VStack align="stretch" spacing={3}>
+  <Card.Root variant="outline" w="full">
+    <Card.Body p={5}>
+      <VStack align="stretch" gap={3}>
         <NetworkBadge env={env} />
         <Link
           href={href}
-          isExternal
+          target="_blank"
+          rel="noreferrer"
           fontFamily="mono"
-          fontSize="xs"
+          textStyle="xs"
           color="text.secondary"
           wordBreak="break-all"
           _hover={{ color: "brand.300" }}
@@ -60,25 +52,25 @@ const DeployedNetwork = ({
           {address}
         </Link>
       </VStack>
-    </CardBody>
-  </Card>
+    </Card.Body>
+  </Card.Root>
 );
 
 export const Readme = () => {
   return (
-    <VStack align="stretch" spacing={6}>
+    <VStack align="stretch" gap={6}>
       <SectionHeading
         eyebrow="Documentation"
         title="How it works"
         description="A simplified Account Abstraction pattern for VeChain — two contracts, deterministic addresses, full version compatibility."
       />
 
-      <Card>
-        <CardBody p={{ base: 6, md: 8 }}>
-          <VStack align="stretch" spacing={8}>
-            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-              <VStack align="stretch" spacing={3}>
-                <HStack spacing={2}>
+      <Card.Root>
+        <Card.Body p={{ base: 6, md: 8 }}>
+          <VStack align="stretch" gap={8}>
+            <SimpleGrid columns={{ base: 1, md: 2 }} gap={6}>
+              <VStack align="stretch" gap={3}>
+                <HStack gap={2}>
                   <Box
                     px={2}
                     py={0.5}
@@ -87,7 +79,7 @@ export const Readme = () => {
                     color="ink.900"
                   >
                     <Text
-                      fontSize="2xs"
+                      textStyle="2xs"
                       fontFamily="mono"
                       fontWeight={800}
                       letterSpacing="0.04em"
@@ -99,10 +91,10 @@ export const Readme = () => {
                     SimpleAccount
                   </Heading>
                 </HStack>
-                <Text fontSize="sm" color="text.muted">
+                <Text textStyle="sm" color="text.muted">
                   A smart contract wallet owned by the user that can:
                 </Text>
-                <List spacing={2.5}>
+                <List.Root gap={2.5} listStyle="none" ml={0}>
                   <Bullet>
                     <BulletText>
                       Execute transactions directly from the owner or through
@@ -115,13 +107,15 @@ export const Readme = () => {
                     </BulletText>
                   </Bullet>
                   <Bullet>
-                    <BulletText>Transfer ownership to another address</BulletText>
+                    <BulletText>
+                      Transfer ownership to another address
+                    </BulletText>
                   </Bullet>
-                </List>
+                </List.Root>
               </VStack>
 
-              <VStack align="stretch" spacing={3}>
-                <HStack spacing={2}>
+              <VStack align="stretch" gap={3}>
+                <HStack gap={2}>
                   <Box
                     px={2}
                     py={0.5}
@@ -130,7 +124,7 @@ export const Readme = () => {
                     color="white"
                   >
                     <Text
-                      fontSize="2xs"
+                      textStyle="2xs"
                       fontFamily="mono"
                       fontWeight={800}
                       letterSpacing="0.04em"
@@ -142,10 +136,10 @@ export const Readme = () => {
                     SimpleAccountFactory
                   </Heading>
                 </HStack>
-                <Text fontSize="sm" color="text.muted">
+                <Text textStyle="sm" color="text.muted">
                   Factory contract that creates and manages SimpleAccounts:
                 </Text>
-                <List spacing={2.5}>
+                <List.Root gap={2.5} listStyle="none" ml={0}>
                   <Bullet>
                     <BulletText>
                       Deterministic addresses using CREATE2
@@ -166,17 +160,17 @@ export const Readme = () => {
                       Manages different SimpleAccount implementation versions
                     </BulletText>
                   </Bullet>
-                </List>
+                </List.Root>
               </VStack>
             </SimpleGrid>
 
-            <Divider />
+            <Separator borderColor="border.subtle" />
 
-            <VStack align="stretch" spacing={4}>
+            <VStack align="stretch" gap={4}>
               <Heading size="md" letterSpacing="-0.02em">
                 Deployed Contracts
               </Heading>
-              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+              <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
                 <DeployedNetwork
                   env="mainnet"
                   address="0xC06Ad8573022e2BE416CA89DA47E8c592971679A"
@@ -189,12 +183,11 @@ export const Readme = () => {
                 />
               </SimpleGrid>
             </VStack>
-
           </VStack>
-        </CardBody>
-      </Card>
+        </Card.Body>
+      </Card.Root>
 
-      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
         <CtaCard
           href="https://github.com/vechain/smart-accounts"
           eyebrow="Source code"
@@ -237,6 +230,8 @@ const CtaCard = ({
   const gradient = isBrand
     ? "linear-gradient(135deg, rgba(19,229,197,0.18) 0%, rgba(19,229,197,0.04) 60%, transparent 100%)"
     : "linear-gradient(135deg, rgba(167,139,250,0.22) 0%, rgba(123,63,228,0.06) 60%, transparent 100%)";
+  const cardBgDark = `${gradient}, #0A0E1A`;
+  const cardBgLight = `${gradient}, white`;
   const borderColor = isBrand
     ? "rgba(19,229,197,0.35)"
     : "rgba(167,139,250,0.4)";
@@ -249,7 +244,10 @@ const CtaCard = ({
   return (
     <Link
       href={href}
-      isExternal
+      target="_blank"
+      rel="noreferrer"
+      display="block"
+      w="full"
       _hover={{ textDecoration: "none" }}
       role="group"
     >
@@ -258,23 +256,22 @@ const CtaCard = ({
         overflow="hidden"
         rounded="2xl"
         p="1px"
-        bg={borderColor}
+        bgColor={borderColor}
         transition="all 0.25s ease"
         _hover={{ transform: "translateY(-3px)" }}
       >
         <Box
           rounded="calc(1rem - 1px)"
-          bg="ink.800"
-          _light={{ bg: "white" }}
-          backgroundImage={gradient}
+          bg={cardBgDark}
+          _light={{ bg: cardBgLight }}
           p={{ base: 5, md: 6 }}
           h="full"
         >
-          <HStack align="flex-start" spacing={4}>
+          <HStack align="flex-start" gap={4}>
             <Box
               boxSize="48px"
               rounded="xl"
-              backgroundImage={iconBg}
+              bg={iconBg}
               display="flex"
               alignItems="center"
               justifyContent="center"
@@ -285,15 +282,20 @@ const CtaCard = ({
                   : "0 8px 24px -8px rgba(123,63,228,0.5)"
               }
             >
-              <Icon
-                as={IconCmp}
+              <Box
                 boxSize="22px"
                 color={isBrand ? "ink.900" : "white"}
-              />
+                display="inline-flex"
+                alignItems="center"
+                justifyContent="center"
+                fontSize="22px"
+              >
+                <IconCmp />
+              </Box>
             </Box>
             <Box flex="1">
               <Text
-                fontSize="2xs"
+                textStyle="2xs"
                 fontWeight={700}
                 letterSpacing="0.14em"
                 textTransform="uppercase"
@@ -310,12 +312,12 @@ const CtaCard = ({
               >
                 {title}
               </Heading>
-              <Text fontSize="sm" color="text.muted" lineHeight="1.5">
+              <Text textStyle="sm" color="text.muted" lineHeight="1.5">
                 {description}
               </Text>
               <HStack
                 mt={4}
-                spacing={1.5}
+                gap={1.5}
                 color={arrowColor}
                 fontSize="sm"
                 fontWeight={600}

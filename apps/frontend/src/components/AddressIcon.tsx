@@ -1,5 +1,5 @@
 import React from "react";
-import { HTMLChakraProps, Img } from "@chakra-ui/react";
+import { HTMLChakraProps, Image } from "@chakra-ui/react";
 import { getPicassoImgSrc } from "../utils";
 
 interface IAddressIcon extends HTMLChakraProps<"img"> {
@@ -14,11 +14,11 @@ interface IPicasso extends HTMLChakraProps<"img"> {
 }
 const Picasso: React.FC<IPicasso> = ({ address, ...props }) => {
   return (
-    <Img
+    <Image
       data-cy={`address-icon-${address}`}
-      objectFit={"cover"}
+      objectFit="cover"
       src={getPicassoImgSrc(address)}
-      h={"100%"}
+      h="100%"
       {...props}
     />
   );

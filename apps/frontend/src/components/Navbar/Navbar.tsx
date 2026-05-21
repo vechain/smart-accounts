@@ -1,6 +1,6 @@
-import { Box, Flex, HStack, Image, Text } from "@chakra-ui/react";
+import { Box, Flex, HStack, Text } from "@chakra-ui/react";
 import { WalletButton } from "@vechain/vechain-kit";
-import logo from "../../assets/logo.png";
+import { Logo } from "../Logo";
 
 export const Navbar = () => {
   return (
@@ -22,19 +22,11 @@ export const Navbar = () => {
         align="center"
         justify="space-between"
       >
-        <HStack spacing={3}>
-          <Box
-            position="relative"
-            boxSize="40px"
-            rounded="full"
-            overflow="hidden"
-            boxShadow="0 0 0 1px rgba(19,229,197,0.25), 0 8px 24px -8px rgba(19,229,197,0.4)"
-          >
-            <Image src={logo} alt="logo" boxSize="40px" objectFit="cover" />
-          </Box>
+        <HStack gap={3}>
+          <Logo size="40px" />
           <Box>
             <Text
-              fontSize={{ base: "sm", md: "md" }}
+              textStyle={{ base: "sm", md: "md" }}
               fontWeight={700}
               letterSpacing="-0.02em"
               lineHeight="1.1"
@@ -42,18 +34,17 @@ export const Navbar = () => {
               Smart Accounts
             </Text>
             <Text
-              fontSize="xs"
+              textStyle="xs"
               color="text.muted"
               fontWeight={500}
               letterSpacing="0.04em"
-              textTransform="uppercase"
             >
-              VeChain
+              on VeChain
             </Text>
           </Box>
         </HStack>
 
-        <HStack spacing={3}>
+        <HStack gap={3}>
           <WalletButton mobileVariant="icon" connectionVariant="popover" />
         </HStack>
       </Flex>

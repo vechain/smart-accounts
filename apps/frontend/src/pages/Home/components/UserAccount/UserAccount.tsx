@@ -1,12 +1,4 @@
-import {
-  Box,
-  Card,
-  CardBody,
-  Divider,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Card, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import { FaCheckCircle } from "react-icons/fa";
 import { FaCircleXmark } from "react-icons/fa6";
 import { EnvConfig } from "@repo/config/contracts";
@@ -46,7 +38,7 @@ export const UserAccount = ({ env, ownerAddress }: UserAccountProps) => {
   }
 
   return (
-    <Card
+    <Card.Root
       w="full"
       transition="all 0.25s ease"
       _hover={{
@@ -54,13 +46,13 @@ export const UserAccount = ({ env, ownerAddress }: UserAccountProps) => {
         borderColor: "border.brand",
       }}
     >
-      <CardBody p={6}>
-        <VStack align="stretch" spacing={5}>
+      <Card.Body p={6}>
+        <VStack align="stretch" gap={5}>
           <NetworkBadge env={env} />
 
           <Box>
             <Text
-              fontSize="xs"
+              textStyle="xs"
               fontWeight={600}
               letterSpacing="0.12em"
               textTransform="uppercase"
@@ -72,20 +64,22 @@ export const UserAccount = ({ env, ownerAddress }: UserAccountProps) => {
             <AddressButtonGhostVariant address={smartAccountAddress ?? ""} />
           </Box>
 
-          <Divider />
+          <Separator borderColor="border.subtle" />
 
           <HStack justify="space-between">
-            <Text fontSize="sm" color="text.muted" fontWeight={500}>
+            <Text textStyle="sm" color="text.muted" fontWeight={500}>
               Status
             </Text>
-            <HStack spacing={2}>
+            <HStack gap={2}>
               <Box
-                as={isAccountDeployed ? FaCheckCircle : FaCircleXmark}
                 color={isAccountDeployed ? "brand.400" : "text.subtle"}
-                boxSize="14px"
-              />
+                fontSize="14px"
+                display="inline-flex"
+              >
+                {isAccountDeployed ? <FaCheckCircle /> : <FaCircleXmark />}
+              </Box>
               <Text
-                fontSize="sm"
+                textStyle="sm"
                 fontWeight={600}
                 color={isAccountDeployed ? "brand.300" : "text.muted"}
                 _light={{
@@ -98,20 +92,19 @@ export const UserAccount = ({ env, ownerAddress }: UserAccountProps) => {
           </HStack>
 
           <HStack justify="space-between">
-            <Text fontSize="sm" color="text.muted" fontWeight={500}>
+            <Text textStyle="sm" color="text.muted" fontWeight={500}>
               Version
             </Text>
             <Box
               px={2.5}
               py={0.5}
               rounded="md"
-              bg="whiteAlpha.100"
-              _light={{ bg: "blackAlpha.50" }}
+              bg="bg.chip"
               border="1px solid"
               borderColor="border.subtle"
             >
               <Text
-                fontSize="xs"
+                textStyle="xs"
                 fontFamily="mono"
                 fontWeight={600}
                 color="text.secondary"
@@ -121,7 +114,7 @@ export const UserAccount = ({ env, ownerAddress }: UserAccountProps) => {
             </Box>
           </HStack>
         </VStack>
-      </CardBody>
-    </Card>
+      </Card.Body>
+    </Card.Root>
   );
 };

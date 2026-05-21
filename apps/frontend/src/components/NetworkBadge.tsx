@@ -32,7 +32,7 @@ export const NetworkBadge = ({ env, size = "sm" }: NetworkBadgeProps) => {
 
   return (
     <HStack
-      spacing={2}
+      gap={2}
       px={px}
       py={1}
       rounded="full"
@@ -40,6 +40,8 @@ export const NetworkBadge = ({ env, size = "sm" }: NetworkBadgeProps) => {
       borderColor={cfg.border}
       bg={cfg.bg}
       display="inline-flex"
+      alignSelf="flex-start"
+      w="fit-content"
     >
       <Box
         boxSize={size === "sm" ? "6px" : "7px"}
@@ -48,7 +50,7 @@ export const NetworkBadge = ({ env, size = "sm" }: NetworkBadgeProps) => {
         boxShadow={cfg.glow}
       />
       <Text
-        fontSize={fontSize}
+        textStyle={fontSize}
         fontWeight={600}
         letterSpacing="0.08em"
         textTransform="uppercase"

@@ -18,9 +18,9 @@
     "serve": "vite serve --mode=development"
   },
   "dependencies": {
-    "@chakra-ui/react": "^2.8.2",
-    "@emotion/react": "^11.11.4",
-    "@emotion/styled": "^11.11.5",
+    "@chakra-ui/charts": "^3.35.0",
+    "@chakra-ui/react": "^3.35.0",
+    "@emotion/react": "^11.14.0",
     "@originjs/vite-plugin-commonjs": "^1.0.3",
     "@tanstack/query-sync-storage-persister": "^5.28.12",
     "@tanstack/react-query": "^5.64.2",
@@ -29,10 +29,12 @@
     "@vechain/vechain-kit": "2.10.0",
     "ethers": "^6.9.0",
     "framer-motion": "^11.2.12",
+    "next-themes": "^0.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.52.0",
     "react-icons": "^5.2.1",
+    "recharts": "^2.12.7",
     "vite": "^5.0.12"
   },
   "devDependencies": {

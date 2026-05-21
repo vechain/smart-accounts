@@ -1,6 +1,7 @@
-import { Box, useColorModeValue } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import { Home } from "./pages/Home";
 import { Navbar } from "./components/Navbar";
+import { useColorModeValue } from "./components/ui/color-mode";
 
 function App() {
   const gradient = useColorModeValue(
@@ -9,7 +10,7 @@ function App() {
   );
 
   return (
-    <Box minH="100vh" w="full" backgroundImage={gradient}>
+    <Box minH="100vh" w="full" bg={gradient}>
       <Navbar />
       <Box
         as="main"

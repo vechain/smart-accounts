@@ -17,13 +17,13 @@ export const SectionHeading = ({
   <HStack
     align={{ base: "flex-start", md: "center" }}
     justify="space-between"
-    spacing={4}
+    gap={4}
     flexDir={{ base: "column", md: "row" }}
   >
-    <VStack align="flex-start" spacing={1}>
+    <VStack align="flex-start" gap={1}>
       {eyebrow && (
         <Text
-          fontSize="xs"
+          textStyle="xs"
           fontWeight={600}
           letterSpacing="0.12em"
           textTransform="uppercase"
@@ -34,14 +34,14 @@ export const SectionHeading = ({
         </Text>
       )}
       <Heading
-        size="lg"
         fontSize={{ base: "2xl", md: "3xl" }}
         letterSpacing="-0.03em"
+        fontWeight={700}
       >
         {title}
       </Heading>
       {description && (
-        <Text color="text.muted" fontSize="sm" maxW="640px">
+        <Text color="text.muted" textStyle="sm" maxW="640px">
           {description}
         </Text>
       )}

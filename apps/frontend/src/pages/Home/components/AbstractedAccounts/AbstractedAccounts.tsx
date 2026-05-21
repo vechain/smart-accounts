@@ -1,12 +1,4 @@
-import {
-  Box,
-  Card,
-  CardBody,
-  Heading,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Card, Heading, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { FaWallet } from "react-icons/fa";
 import { useWallet, WalletButton } from "@vechain/vechain-kit";
 import { UserAccount } from "../UserAccount/UserAccount";
@@ -25,7 +17,7 @@ export const AbstractedAccounts = () => {
   );
 
   return (
-    <VStack align="stretch" spacing={5}>
+    <VStack align="stretch" gap={5}>
       <SectionHeading
         eyebrow="Your account"
         title="Your smart accounts"
@@ -33,9 +25,9 @@ export const AbstractedAccounts = () => {
       />
 
       {!connectedWallet ? (
-        <Card variant="glow">
-          <CardBody p={{ base: 8, md: 12 }}>
-            <VStack spacing={5} textAlign="center">
+        <Card.Root variant="glow">
+          <Card.Body p={{ base: 8, md: 12 }}>
+            <VStack gap={5} textAlign="center">
               <Box
                 p={4}
                 rounded="2xl"
@@ -43,10 +35,12 @@ export const AbstractedAccounts = () => {
                 border="1px solid"
                 borderColor="border.brand"
                 color="brand.400"
+                fontSize="28px"
+                display="inline-flex"
               >
-                <Box as={FaWallet} boxSize="28px" />
+                <FaWallet />
               </Box>
-              <VStack spacing={2}>
+              <VStack gap={2}>
                 <Heading size="md" letterSpacing="-0.02em">
                   Connect your wallet
                 </Heading>
@@ -57,16 +51,16 @@ export const AbstractedAccounts = () => {
               </VStack>
               <WalletButton />
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       ) : !testnetAccountAddress && !mainnetAccountAddress ? (
-        <Card variant="outline">
-          <CardBody p={8} textAlign="center">
+        <Card.Root variant="outline">
+          <Card.Body p={8} textAlign="center">
             <Heading size="md">No smart account found</Heading>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       ) : (
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+        <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
           <UserAccount
             env="mainnet"
             ownerAddress={connectedWallet?.address ?? ""}

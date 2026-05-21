@@ -1,14 +1,14 @@
 import {
+  Box,
   Button,
   HStack,
   Text,
   useClipboard,
-  Icon,
-  ButtonProps,
-  ImageProps,
-  TextProps,
+  type ButtonProps,
+  type ImageProps,
+  type TextProps,
 } from "@chakra-ui/react";
-import React, { useEffect } from "react";
+import React from "react";
 import { AddressIcon } from "./AddressIcon";
 
 import { FaCheck, FaCopy } from "react-icons/fa6";
@@ -40,7 +40,7 @@ export const AddressButton: React.FC<IAddressButton> = ({
   charAtEnd = 4,
   ...props
 }) => {
-  const { onCopy, hasCopied, setValue } = useClipboard(address);
+  const clipboard = useClipboard({ value: address });
 
   const { onClick, ...otherProps } = props;
 
@@ -48,19 +48,15 @@ export const AddressButton: React.FC<IAddressButton> = ({
     e: React.MouseEvent<HTMLButtonElement, MouseEvent>
   ) => {
     if (onClick) onClick(e);
-    if (showCopyIcon) onCopy();
+    if (showCopyIcon) clipboard.copy();
   };
 
-  useEffect(() => {
-    setValue(address);
-  }, [address, setValue]);
-
-  const spacing = ["xs", "sm"].includes(buttonSize) ? 2 : 3;
+  const gap = ["xs", "sm"].includes(buttonSize) ? 2 : 3;
 
   return (
     <Button
       data-cy={`address-button-${address}`}
-      size={buttonSize}
+      size={buttonSize as ButtonProps["size"]}
       onClick={onClickHandler}
       pl={showAddressIcon ? 1 : 3}
       pr={3}
@@ -77,18 +73,16 @@ export const AddressButton: React.FC<IAddressButton> = ({
       transition="all 0.15s ease"
       {...otherProps}
     >
-      <HStack
-        justify={"flex-start"}
-        spacing={spacing}
-        h="full"
-      >
+      <HStack justify="flex-start" gap={gap} h="full">
         {showInfoIcon && (
-          <Icon
+          <Box
             data-cy="address-button-info-icon"
             aria-label="View details"
-            as={FaWallet}
             color="text.muted"
-          />
+            display="inline-flex"
+          >
+            <FaWallet />
+          </Box>
         )}
         {showAddressIcon && (
           <AddressIcon address={address} rounded="full" {...imageProps} />
@@ -104,14 +98,16 @@ export const AddressButton: React.FC<IAddressButton> = ({
             : humanAddress(address, charAtStart, charAtEnd)}
         </Text>
         {showCopyIcon && (
-          <Icon
+          <Box
             data-cy="address-button-copy-icon"
             aria-label="Copy Address"
-            as={hasCopied ? FaCheck : FaCopy}
-            color={hasCopied ? "brand.400" : "text.muted"}
+            color={clipboard.copied ? "brand.400" : "text.muted"}
             boxSize="12px"
+            display="inline-flex"
             transition="color 0.15s ease"
-          />
+          >
+            {clipboard.copied ? <FaCheck /> : <FaCopy />}
+          </Box>
         )}
       </HStack>
     </Button>
