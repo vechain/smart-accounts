@@ -11,39 +11,6 @@ export type SeriesBucket = {
 };
 export type MonthlyBucket = SeriesBucket & { cumulative: number };
 
-export type TokenKey = "vet" | "b3tr" | "vot3" | "vtho";
-export type VersionKey = "nativeV3" | "upgradedV1ToV3" | "stillV1";
-
-export type VersionTreasury = {
-  accounts: number;
-  withBalance: number;
-  totals: Record<TokenKey, string>;
-  holders: Record<TokenKey, number>;
-  tiers: { hot: number; warm: number; cold: number };
-};
-
-export type Treasury = {
-  accountsCounted: number;
-  fleet: {
-    totals: Record<TokenKey, string>;
-    holders: Record<TokenKey, number>;
-  };
-  byVersion: Record<VersionKey, VersionTreasury>;
-};
-
-export type X2EarnAppRow = {
-  appId: string;
-  name: string;
-  uniqueReceivers: number;
-  rewardEvents: number;
-  totalAmount: string;
-};
-
-export type TopX2EarnApps = {
-  scannedThroughBlock: number;
-  items: X2EarnAppRow[];
-};
-
 export type Insights = {
   generatedAt: string;
   network: string;
@@ -63,8 +30,6 @@ export type Insights = {
     weekly: SeriesBucket[];
     monthly: MonthlyBucket[];
   };
-  treasury: Treasury | null;
-  topX2EarnApps: TopX2EarnApps | null;
 };
 
 const REPO = "vechain/smart-accounts";

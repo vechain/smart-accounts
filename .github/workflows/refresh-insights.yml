@@ -4,9 +4,9 @@ name: Refresh insights
 # to main. The frontend fetches the JSON at runtime via the jsdelivr CDN so the
 # deployed site picks up new data without a rebuild.
 #
-# Persistent on-chain state (events / versions / balances / rewards caches)
-# lives on the `insights-cache` orphan branch. It's seeded once locally so the
-# pipeline never has to do a cold full fetch from block 0.
+# Persistent on-chain state (events + versions caches) lives on the
+# `insights-cache` orphan branch. It's seeded once locally so the pipeline
+# never has to do a cold full fetch from block 0.
 #
 # Daily flow:
 #   1. Restore .cache/ from insights-cache (git archive | tar -x).
@@ -71,8 +71,8 @@ jobs:
             ls -la "$DIR" || true
           else
             echo "::warning::Cache branch '$BRANCH' does not exist."
-            echo "Run 'yarn contracts:analyze-deep:mainnet && yarn contracts:analyze-rewards:mainnet' locally,"
-            echo "then push $DIR contents to the '$BRANCH' branch to skip cold start."
+            echo "Run 'yarn contracts:analyze:mainnet' locally, then push the"
+            echo "$DIR contents to the '$BRANCH' branch to skip cold start."
           fi
 
       - name: Install dependencies
@@ -82,8 +82,7 @@ jobs:
         env:
           NODE_OPTIONS: "--max-old-space-size=6144"
         run: |
-          yarn contracts:analyze-deep:mainnet
-          yarn contracts:analyze-rewards:mainnet
+          yarn contracts:analyze:mainnet
           yarn contracts:export-insights:mainnet
 
       - name: Push refreshed cache to insights-cache branch

@@ -55,6 +55,10 @@ const EVENTS_CACHE_PATH = path.join(
   CACHE_DIR,
   `events-${network.name}-${factoryAddress.toLowerCase()}.json`
 );
+const VERSIONS_CACHE_PATH = path.join(
+  CACHE_DIR,
+  `versions-${network.name}-${factoryAddress.toLowerCase()}.json`
+);
 const FORCE_REFRESH = process.env.REFRESH_EVENTS === "1";
 
 const http = axios.create({ timeout: HTTP_TIMEOUT_MS });
@@ -382,6 +386,15 @@ async function main() {
 
   console.log("Querying current version() of each account...");
   const versions = await batchCallVersion(unique.map((c) => c.address));
+
+  // Persist the version map so exportInsights can read it later.
+  const versionsMap: Record<string, number | null> = {};
+  for (let i = 0; i < unique.length; i++) {
+    versionsMap[unique[i].address] = versions[i];
+  }
+  if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+  fs.writeFileSync(VERSIONS_CACHE_PATH, JSON.stringify(versionsMap));
+  console.log(`Cached versions at ${VERSIONS_CACHE_PATH}\n`);
 
   let stillV1 = 0;
   let upgradedV1toV3 = 0;

@@ -29,10 +29,6 @@
     "contracts:verify:mainnet": "dotenv -v NEXT_PUBLIC_APP_ENV=mainnet -- turbo run verify:mainnet --filter=contracts -- ",
     "contracts:analyze:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts analyze:account-versions:testnet",
     "contracts:analyze:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts analyze:account-versions:mainnet",
-    "contracts:analyze-deep:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts analyze:account-versions-deep:testnet",
-    "contracts:analyze-deep:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts analyze:account-versions-deep:mainnet",
-    "contracts:analyze-rewards:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts analyze:rewards:testnet",
-    "contracts:analyze-rewards:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts analyze:rewards:mainnet",
     "contracts:export-insights:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts analyze:export-insights:testnet",
     "contracts:export-insights:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts analyze:export-insights:mainnet"
   },

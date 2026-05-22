@@ -32,10 +32,6 @@
     "verify:mainnet": "npx hardhat verify --network vechain_mainnet",
     "analyze:account-versions:testnet": "npx hardhat run scripts/analytics/accountVersions.ts --network vechain_testnet",
     "analyze:account-versions:mainnet": "npx hardhat run scripts/analytics/accountVersions.ts --network vechain_mainnet",
-    "analyze:account-versions-deep:testnet": "npx hardhat run scripts/analytics/accountVersionsDeep.ts --network vechain_testnet",
-    "analyze:account-versions-deep:mainnet": "npx hardhat run scripts/analytics/accountVersionsDeep.ts --network vechain_mainnet",
-    "analyze:rewards:testnet": "npx hardhat run scripts/analytics/analyzeRewards.ts --network vechain_testnet",
-    "analyze:rewards:mainnet": "npx hardhat run scripts/analytics/analyzeRewards.ts --network vechain_mainnet",
     "analyze:export-insights:testnet": "npx hardhat run scripts/analytics/exportInsights.ts --network vechain_testnet",
     "analyze:export-insights:mainnet": "npx hardhat run scripts/analytics/exportInsights.ts --network vechain_mainnet"
   },
