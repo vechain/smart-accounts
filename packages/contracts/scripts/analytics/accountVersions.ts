@@ -397,14 +397,38 @@ async function main() {
   const unique = [...byAddress.values()];
   console.log(`Unique account addresses:    ${unique.length}\n`);
 
-  console.log("Querying current version() of each account...");
-  const versions = await batchCallVersion(unique.map((c) => c.address));
+  // Reuse any previously-resolved version() result so re-runs only hit the
+  // RPC for addresses we've never seen before. version() == 3 is permanent;
+  // version() == null means the proxy still points at V1 — when an owner
+  // upgrades V1 → V3 we'll re-resolve them via the periodic refresh below.
+  const versionsMap: Record<string, number | null> = (() => {
+    if (!fs.existsSync(VERSIONS_CACHE_PATH)) return {};
+    try {
+      return JSON.parse(fs.readFileSync(VERSIONS_CACHE_PATH, "utf8"));
+    } catch {
+      return {};
+    }
+  })();
 
-  // Persist the version map so exportInsights can read it later.
-  const versionsMap: Record<string, number | null> = {};
-  for (let i = 0; i < unique.length; i++) {
-    versionsMap[unique[i].address] = versions[i];
+  const addressesToQuery: string[] = [];
+  // Always re-check addresses that previously reverted (could have upgraded
+  // since), plus any never-seen address.
+  for (const c of unique) {
+    const v = versionsMap[c.address];
+    if (v === undefined || v === null) addressesToQuery.push(c.address);
   }
+
+  console.log(
+    `Versions cache: ${Object.keys(versionsMap).length} entries · ${addressesToQuery.length} to (re)query.`
+  );
+
+  if (addressesToQuery.length > 0) {
+    const versions = await batchCallVersion(addressesToQuery);
+    for (let i = 0; i < addressesToQuery.length; i++) {
+      versionsMap[addressesToQuery[i]] = versions[i];
+    }
+  }
+
   if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
   fs.writeFileSync(VERSIONS_CACHE_PATH, JSON.stringify(versionsMap));
   console.log(`Cached versions at ${VERSIONS_CACHE_PATH}\n`);
@@ -415,11 +439,10 @@ async function main() {
   let nativeV3StillV1 = 0; // shouldn't happen, but track defensively
   let unknownVersion = 0;
 
-  for (let i = 0; i < unique.length; i++) {
-    const c = unique[i];
-    const ver = versions[i];
+  for (const c of unique) {
+    const ver = versionsMap[c.address];
 
-    if (ver === null) {
+    if (ver === null || ver === undefined) {
       // version() reverted → V1 (V1 accounts don't have version())
       if (c.originalImpl === "V1") stillV1++;
       else nativeV3StillV1++;
