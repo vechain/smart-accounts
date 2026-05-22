@@ -5,6 +5,7 @@ import { Agent as HttpAgent } from "http";
 import { Agent as HttpsAgent } from "https";
 import fs from "fs";
 import path from "path";
+import zlib from "zlib";
 import { getConfig } from "@repo/config";
 import { EnvConfig } from "@repo/config/contracts";
 import { SimpleAccountFactory__factory } from "../..";
@@ -55,14 +56,25 @@ const HTTP_TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 6;
 
 const CACHE_DIR = path.resolve(__dirname, ".cache");
+// Caches are gzipped on disk: the events JSON is >100 MB plain, which exceeds
+// GitHub's per-file limit. Roughly 2–3× smaller as .json.gz and trivial to
+// (de)serialize via zlib.
 const EVENTS_CACHE_PATH = path.join(
   CACHE_DIR,
-  `events-${network.name}-${factoryAddress.toLowerCase()}.json`
+  `events-${network.name}-${factoryAddress.toLowerCase()}.json.gz`
 );
 const VERSIONS_CACHE_PATH = path.join(
   CACHE_DIR,
-  `versions-${network.name}-${factoryAddress.toLowerCase()}.json`
+  `versions-${network.name}-${factoryAddress.toLowerCase()}.json.gz`
 );
+
+function readJsonGz<T>(p: string): T {
+  return JSON.parse(zlib.gunzipSync(fs.readFileSync(p)).toString("utf8")) as T;
+}
+
+function writeJsonGz(p: string, data: unknown) {
+  fs.writeFileSync(p, zlib.gzipSync(JSON.stringify(data)));
+}
 const FORCE_REFRESH = process.env.REFRESH_EVENTS === "1";
 
 // Keep-alive + a generous socket pool so we re-use TCP / TLS connections
@@ -181,8 +193,7 @@ function loadEventsCache(): EventEntry[] | null {
   if (FORCE_REFRESH) return null;
   if (!fs.existsSync(EVENTS_CACHE_PATH)) return null;
   try {
-    const raw = fs.readFileSync(EVENTS_CACHE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as EventEntry[];
+    const parsed = readJsonGz<EventEntry[]>(EVENTS_CACHE_PATH);
     if (!Array.isArray(parsed) || parsed.length === 0) return null;
     return parsed;
   } catch {
@@ -192,7 +203,7 @@ function loadEventsCache(): EventEntry[] | null {
 
 function saveEventsCache(events: EventEntry[]) {
   if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
-  fs.writeFileSync(EVENTS_CACHE_PATH, JSON.stringify(events));
+  writeJsonGz(EVENTS_CACHE_PATH, events);
 }
 
 function buildInitCodeHash(
@@ -404,7 +415,7 @@ async function main() {
   const versionsMap: Record<string, number | null> = (() => {
     if (!fs.existsSync(VERSIONS_CACHE_PATH)) return {};
     try {
-      return JSON.parse(fs.readFileSync(VERSIONS_CACHE_PATH, "utf8"));
+      return readJsonGz<Record<string, number | null>>(VERSIONS_CACHE_PATH);
     } catch {
       return {};
     }
@@ -430,7 +441,7 @@ async function main() {
   }
 
   if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
-  fs.writeFileSync(VERSIONS_CACHE_PATH, JSON.stringify(versionsMap));
+  writeJsonGz(VERSIONS_CACHE_PATH, versionsMap);
   console.log(`Cached versions at ${VERSIONS_CACHE_PATH}\n`);
 
   let stillV1 = 0;

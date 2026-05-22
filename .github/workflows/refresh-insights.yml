@@ -65,10 +65,10 @@ jobs:
           mkdir -p "$DIR"
           if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null 2>&1; then
             git fetch --depth 1 origin "$BRANCH":"$BRANCH"
-            # Stream the cache files out of the branch without switching HEAD.
+            # Stream the gzipped cache files out of the branch without switching HEAD.
             git archive "$BRANCH" | tar -x
             echo "Restored cache from $BRANCH:"
-            ls -la "$DIR" || true
+            ls -lh "$DIR" || true
           else
             echo "::warning::Cache branch '$BRANCH' does not exist."
             echo "Run 'yarn contracts:analyze:mainnet' locally, then push the"

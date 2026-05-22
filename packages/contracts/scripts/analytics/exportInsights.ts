@@ -2,13 +2,14 @@ import { ethers, artifacts, network } from "hardhat";
 import { Interface } from "ethers";
 import fs from "fs";
 import path from "path";
+import zlib from "zlib";
 import { getConfig } from "@repo/config";
 import { EnvConfig } from "@repo/config/contracts";
 import { SimpleAccountFactory__factory } from "../..";
 
-// Reads the events + versions + balances caches produced by accountVersions.ts /
-// accountVersionsDeep.ts and writes a small pre-aggregated insights JSON into the
-// frontend so charts can render without any on-chain calls.
+// Reads the gzipped events + versions caches produced by accountVersions.ts
+// and writes a small pre-aggregated insights JSON into the frontend so charts
+// can render without any on-chain calls.
 
 const env = process.env.VITE_APP_ENV as EnvConfig | undefined;
 if (!env) throw new Error("VITE_APP_ENV env variable must be set");
@@ -23,11 +24,11 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const CACHE_DIR = path.resolve(__dirname, ".cache");
 const EVENTS_CACHE_PATH = path.join(
   CACHE_DIR,
-  `events-${network.name}-${factoryAddress.toLowerCase()}.json`
+  `events-${network.name}-${factoryAddress.toLowerCase()}.json.gz`
 );
 const VERSIONS_CACHE_PATH = path.join(
   CACHE_DIR,
-  `versions-${network.name}-${factoryAddress.toLowerCase()}.json`
+  `versions-${network.name}-${factoryAddress.toLowerCase()}.json.gz`
 );
 
 const OUTPUT_PATH = path.resolve(
@@ -51,7 +52,7 @@ function readJson<T>(p: string): T {
       `Cache file missing: ${p}\nRun the analytics scripts first (yarn contracts:analyze:${env}).`
     );
   }
-  return JSON.parse(fs.readFileSync(p, "utf8"));
+  return JSON.parse(zlib.gunzipSync(fs.readFileSync(p)).toString("utf8")) as T;
 }
 
 function buildInitCodeHash(
