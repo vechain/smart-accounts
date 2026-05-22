@@ -1,6 +1,8 @@
 import { ethers, artifacts, network } from "hardhat";
 import { Interface } from "ethers";
 import axios, { AxiosError } from "axios";
+import { Agent as HttpAgent } from "http";
+import { Agent as HttpsAgent } from "https";
 import fs from "fs";
 import path from "path";
 import { getConfig } from "@repo/config";
@@ -46,7 +48,9 @@ const LOG_PAGE_SIZE = 1000;
 
 // Thor's /accounts/* multi-clause simulation truncates the response when a clause reverts,
 // which silently miscounts the V1 vs V3 split. Issue version() as one clause per request.
-const SINGLE_CALL_CONCURRENCY = 50;
+// Concurrency tuned conservatively — vechain.energy starts returning 500s once we sustain
+// more than ~20 concurrent simulations from a single client.
+const SINGLE_CALL_CONCURRENCY = 16;
 const HTTP_TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 6;
 
@@ -61,7 +65,16 @@ const VERSIONS_CACHE_PATH = path.join(
 );
 const FORCE_REFRESH = process.env.REFRESH_EVENTS === "1";
 
-const http = axios.create({ timeout: HTTP_TIMEOUT_MS });
+// Keep-alive + a generous socket pool so we re-use TCP / TLS connections
+// across the thousands of single-clause version() calls instead of paying
+// handshake overhead per request.
+const httpAgent = new HttpAgent({ keepAlive: true, maxSockets: 64 });
+const httpsAgent = new HttpsAgent({ keepAlive: true, maxSockets: 64 });
+const http = axios.create({
+  timeout: HTTP_TIMEOUT_MS,
+  httpAgent,
+  httpsAgent,
+});
 
 type EventEntry = {
   account: string;
