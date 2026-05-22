@@ -33,7 +33,11 @@ export type Insights = {
 };
 
 const REPO = "vechain/smart-accounts";
-const BRANCH = "main";
+// The daily GHA pushes the freshest insights JSON to this orphan branch
+// (alongside the gzipped on-chain caches it consumes). main is branch-
+// protected and rejects direct pushes from the workflow, so a sidecar branch
+// is the cleanest place to host live data.
+const BRANCH = "insights-cache";
 const FILE = "apps/frontend/src/data/insights-mainnet.json";
 
 // jsdelivr serves any file from a public GitHub repo with proper CORS, no

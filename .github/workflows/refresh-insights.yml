@@ -1,21 +1,17 @@
 name: Refresh insights
 
-# Re-runs the on-chain analytics pipeline and commits the updated insights JSON
-# to main. The frontend fetches the JSON at runtime via the jsdelivr CDN so the
-# deployed site picks up new data without a rebuild.
-#
-# Persistent on-chain state (events + versions caches) lives on the
-# `insights-cache` orphan branch. It's seeded once locally so the pipeline
-# never has to do a cold full fetch from block 0.
+# Re-runs the on-chain analytics pipeline and force-pushes everything (the
+# gzipped events+versions caches and the rebuilt insights JSON) to the orphan
+# `insights-cache` branch as a single rolling commit. The frontend fetches
+# the JSON at runtime via jsdelivr against this branch, so the deployed site
+# picks up new data without a rebuild and without us needing to push to a
+# protected main branch.
 #
 # Daily flow:
 #   1. Restore .cache/ from insights-cache (git archive | tar -x).
 #   2. Run analytics pipeline incrementally.
-#   3. Force-push refreshed .cache/ back to insights-cache (rolling single commit).
-#   4. Commit the updated insights JSON to main.
-#
-# Pushes from the default GITHUB_TOKEN do NOT trigger other workflows, so the
-# commit on main will not re-trigger deploy.yml or unit-tests.yml.
+#   3. Force-push refreshed .cache/ + insights-mainnet.json back to
+#      insights-cache as one rolling commit.
 
 on:
   schedule:
@@ -85,29 +81,38 @@ jobs:
           yarn contracts:analyze:mainnet
           yarn contracts:export-insights:mainnet
 
-      - name: Push refreshed cache to insights-cache branch
+      - name: Push refreshed cache + insights JSON to insights-cache branch
         env:
           BRANCH: ${{ env.CACHE_BRANCH }}
           DIR: ${{ env.CACHE_DIR }}
+          JSON: ${{ env.INSIGHTS_JSON }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           # Build the cache-branch state in an isolated worktree so the main
-          # checkout (and the freshly written insights JSON) stays untouched.
+          # checkout stays untouched. The branch holds two kinds of artifacts:
+          #   - .cache/*.json.gz : seed for the next run's incremental fetch
+          #   - apps/frontend/src/data/insights-mainnet.json : served via
+          #     jsdelivr to the live site
+          # Both live here to sidestep main's branch protection rule (direct
+          # pushes are forbidden).
           WT=$(mktemp -d)
           git worktree add --detach "$WT"
-          # Wipe everything except .git so the orphan commit is clean.
           find "$WT" -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
+
           mkdir -p "$WT/$DIR"
           cp -R "$DIR"/. "$WT/$DIR"/
+
+          mkdir -p "$WT/$(dirname "$JSON")"
+          cp "$JSON" "$WT/$JSON"
 
           (
             cd "$WT"
             git checkout --orphan rolling
-            git add -f "$DIR"
+            git add -f "$DIR" "$JSON"
             if git diff --cached --quiet; then
-              echo "No cache changes; skipping push."
+              echo "No changes; skipping push."
             else
               git commit -m "chore(insights-cache): refresh $(date -u +%Y-%m-%dT%H:%M:%SZ)"
               # Single rolling commit, no history bloat.
@@ -116,18 +121,3 @@ jobs:
           )
 
           git worktree remove --force "$WT"
-
-      - name: Commit insights JSON to main
-        env:
-          JSON: ${{ env.INSIGHTS_JSON }}
-          DIR: ${{ env.CACHE_DIR }}
-        run: |
-          # The .cache directory is gitignored on main, so it won't appear in
-          # the diff. Only the JSON should change.
-          if git diff --quiet -- "$JSON"; then
-            echo "No insights changes; nothing to commit."
-            exit 0
-          fi
-          git add "$JSON"
-          git commit -m "chore(insights): refresh on-chain analytics snapshot"
-          git push origin main
