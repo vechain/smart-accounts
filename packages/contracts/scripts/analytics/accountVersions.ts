@@ -409,9 +409,16 @@ async function main() {
   console.log(`Unique account addresses:    ${unique.length}\n`);
 
   // Reuse any previously-resolved version() result so re-runs only hit the
-  // RPC for addresses we've never seen before. version() == 3 is permanent;
-  // version() == null means the proxy still points at V1 — when an owner
-  // upgrades V1 → V3 we'll re-resolve them via the periodic refresh below.
+  // RPC for addresses we've never seen before.
+  //
+  //   version() == 3   → permanent, never re-queried.
+  //   version() == null → "Still V1". By default we don't re-query these
+  //                       because there are ~146k of them and at the
+  //                       sustainable RPC rate that's hours per run. Set
+  //                       REFRESH_NULL_VERSIONS=1 to do a full sweep when
+  //                       you want to pick up V1 → V3 upgrades (occasional,
+  //                       triggered manually, not on the daily cron).
+  const refreshNulls = process.env.REFRESH_NULL_VERSIONS === "1";
   const versionsMap: Record<string, number | null> = (() => {
     if (!fs.existsSync(VERSIONS_CACHE_PATH)) return {};
     try {
@@ -422,15 +429,21 @@ async function main() {
   })();
 
   const addressesToQuery: string[] = [];
-  // Always re-check addresses that previously reverted (could have upgraded
-  // since), plus any never-seen address.
   for (const c of unique) {
     const v = versionsMap[c.address];
-    if (v === undefined || v === null) addressesToQuery.push(c.address);
+    if (v === undefined) {
+      // Never seen → must query.
+      addressesToQuery.push(c.address);
+    } else if (v === null && refreshNulls) {
+      // Previously reverted; only re-check on explicit refresh.
+      addressesToQuery.push(c.address);
+    }
   }
 
+  const knownNulls = Object.values(versionsMap).filter((v) => v === null)
+    .length;
   console.log(
-    `Versions cache: ${Object.keys(versionsMap).length} entries · ${addressesToQuery.length} to (re)query.`
+    `Versions cache: ${Object.keys(versionsMap).length} entries (${knownNulls} null) · ${addressesToQuery.length} to (re)query${refreshNulls ? " [REFRESH_NULL_VERSIONS=1]" : ""}.`
   );
 
   if (addressesToQuery.length > 0) {
