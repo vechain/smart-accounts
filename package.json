@@ -1,0 +1,53 @@
+{
+  "name": "smart-accounts-factory",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "build:testnet": "dotenv -v VITE_APP_ENV=testnet -e .env -- turbo build:prod",
+    "build:mainnet": "dotenv -v VITE_APP_ENV=mainnet -e .env -- turbo build:prod",
+    "lint": "turbo lint",
+    "clean": "turbo clean",
+    "purge": "turbo purge",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "dev:testnet": "yarn && dotenv -v VITE_APP_ENV=testnet -e .env -- turbo dev:testnet --",
+    "dev:mainnet": "yarn && dotenv -v VITE_APP_ENV=mainnet -e .env -- turbo dev:mainnet --",
+    "contracts:compile": "dotenv -v VITE_APP_ENV=testnet -- turbo run compile --filter=@repo/contracts",
+    "contracts:deploy:testnet": "dotenv -v VITE_APP_ENV=testnet -- turbo run deploy:testnet --filter=@repo/contracts",
+    "contracts:deploy:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- turbo run deploy:mainnet --filter=@repo/contracts",
+    "contracts:upgrade": "dotenv -v VITE_APP_ENV=local -- yarn workspace @repo/contracts ts-node scripts/upgrade/select-and-upgrade.ts",
+    "contracts:upgrade:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts ts-node scripts/upgrade/select-and-upgrade.ts",
+    "contracts:upgrade:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts ts-node scripts/upgrade/select-and-upgrade.ts",
+    "check-contracts-deployment:testnet": "npx hardhat run scripts/checkContractsDeployment.ts --network vechain_testnet",
+    "check-contracts-deployment:mainnet": "npx hardhat run scripts/checkContractsDeployment.ts --network vechain_mainnet",
+    "solo-up": "make solo-up",
+    "solo-down": "make solo-down",
+    "solo-clean": "make solo-clean",
+    "contracts:test": "dotenv -v NEXT_PUBLIC_APP_ENV=local -- turbo run test:hardhat --filter=contracts",
+    "contracts:generate-docs": "dotenv -v NEXT_PUBLIC_APP_ENV=local -- turbo run generate-docs --filter=contracts",
+    "test:coverage:solidity": "dotenv -v NEXT_PUBLIC_APP_ENV=local -v IS_TEST_COVERAGE=true -e .env.example turbo run test:coverage:solidity",
+    "contracts:verify:testnet": "dotenv -v NEXT_PUBLIC_APP_ENV=testnet -- turbo run verify:testnet --filter=contracts -- ",
+    "contracts:verify:mainnet": "dotenv -v NEXT_PUBLIC_APP_ENV=mainnet -- turbo run verify:mainnet --filter=contracts -- ",
+    "contracts:analyze:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts analyze:account-versions:testnet",
+    "contracts:analyze:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts analyze:account-versions:mainnet",
+    "contracts:export-insights:testnet": "dotenv -v VITE_APP_ENV=testnet -- yarn workspace @repo/contracts analyze:export-insights:testnet",
+    "contracts:export-insights:mainnet": "dotenv -v VITE_APP_ENV=mainnet -- yarn workspace @repo/contracts analyze:export-insights:mainnet"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "turbo": "^1.13.3",
+    "typescript": "^5.4.5",
+    "dotenv-cli": "latest"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "yarn@1.22.17",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "resolutions": {
+    "elliptic": "6.6.1",
+    "pbkdf2": "3.1.3"
+  }
+}
