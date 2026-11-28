@@ -1,0 +1,49 @@
+import { chakra } from "@chakra-ui/react";
+import { useId, type ComponentProps } from "react";
+
+type LogoProps = ComponentProps<typeof chakra.svg> & {
+  size?: string | number;
+};
+
+export const Logo = ({ size = "40px", ...props }: LogoProps) => {
+  const id = useId();
+  const gradId = `logo-grad-${id}`;
+  return (
+    <chakra.svg
+      viewBox="0 0 32 32"
+      width={size}
+      height={size}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="32" y2="32">
+          <stop offset="0%" stopColor="#13E5C5" />
+          <stop offset="55%" stopColor="#3DEFC9" />
+          <stop offset="100%" stopColor="#7B3FE4" />
+        </linearGradient>
+      </defs>
+
+      <rect width="32" height="32" rx="9" fill={`url(#${gradId})`} />
+
+      {/* Three social-login dots, offset for depth */}
+      <circle cx="10.5" cy="9.5" r="1.4" fill="white" opacity="0.7" />
+      <circle cx="16" cy="7.6" r="1.7" fill="white" />
+      <circle cx="21.5" cy="9.5" r="1.4" fill="white" opacity="0.7" />
+
+      {/* Wallet body */}
+      <rect
+        x="6.5"
+        y="13.5"
+        width="19"
+        height="12"
+        rx="2.6"
+        fill="white"
+      />
+
+      {/* Card slot / clasp accent — gradient peek-through */}
+      <circle cx="20.5" cy="19.5" r="1.6" fill={`url(#${gradId})`} />
+    </chakra.svg>
+  );
+};
